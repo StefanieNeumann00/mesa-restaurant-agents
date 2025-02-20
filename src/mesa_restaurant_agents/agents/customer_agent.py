@@ -18,7 +18,7 @@ class CustomerAgent(mesa.Agent):
         # Table assignment and timing
         self.table = None                             # Assigned table
         self.arrival_time = None                      # Time customer arrived
-        self.dining_duration = random.randint(60, 90, 120) # Time to spend at restaurant
+        self.dining_duration = random.randint(60,90, 120) # Time to spend at restaurant
 
     def step(self):
         """Update customer state each time step (5 minutes)"""
