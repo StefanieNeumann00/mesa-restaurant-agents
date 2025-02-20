@@ -1,5 +1,6 @@
 import mesa
 import numpy as np
+import random
 from datetime import datetime, timedelta
 
 from ..agents.customer_agent import CustomerAgent
