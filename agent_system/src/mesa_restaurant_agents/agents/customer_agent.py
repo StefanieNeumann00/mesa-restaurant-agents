@@ -17,12 +17,12 @@ class CustomerAgent(mesa.Agent):
 
         # Table assignment and timing
         self.table = None                             # Assigned table
-        self.dining_duration = random.randint(60, 120) # Time to spend at restaurant
+        self.dining_duration = random.randint(60, 120)  # Time to spend at restaurant
 
     def step(self):
         """Update customer state each time step (1 minute)"""
         # Increment waiting time if not served yet
-        if (self.order_status != OrderStatus.SERVED):
+        if self.order_status != OrderStatus.SERVED:
             self.waiting_time = ((self.model.current_time - self.order_time).total_seconds() % 3600) // 60
             self.satisfaction = max(0, 100 - (self.waiting_time * 2))  # Decrease by 2 points per minute
             if self.waiting_time >= self.dining_duration:
