@@ -11,7 +11,7 @@ from ..agents.waiter_agent import WaiterAgent
 from ..utils.table import Table
 
 class RestaurantModel(mesa.Model):
-    def __init__(self, n_waiters, seed=None):
+    def __init__(self, n_waiters, grid_width, grid_height, seed=None):
         super().__init__(seed=seed)
 
         self.opening_time = datetime.strptime("11:00", "%H:%M")
@@ -24,23 +24,8 @@ class RestaurantModel(mesa.Model):
         WaiterAgent.create_agents(model=self, n=n_waiters)
         ManagerAgent.create_agents(model=self, n=1)
 
-        '''
-        self.customers = []
-        self.waiters = []
-        self.managers = []
-
-        for agent in self.agents:
-            if isinstance(agent, CustomerAgent):
-                self.customers.append(agent)
-            elif isinstance(agent, WaiterAgent):
-                self.waiters.append(agent)
-            elif isinstance(agent, ManagerAgent):
-                self.managers.append(agent)
-
-        print(self.customers)
-        print(self.waiters)
-        print(self.managers)
-        '''
+        self.grid = mesa.space.MultiGrid(grid_width, grid_height, True)
+        self.position(self.agents)
 
         # Set up data collection for model metrics
         self.datacollector = mesa.DataCollector(
@@ -52,6 +37,16 @@ class RestaurantModel(mesa.Model):
                 "Customer_Info": lambda m: self.get_customer_info(m.agents)
             }
         )
+
+    def position(self, agents):
+        for agent in agents:
+            self.grid.empties
+            x = random.randint(0, self.grid.width-1)
+            y = random.randint(0, self.grid.height-1)
+            while not self.grid.is_cell_empty((x,y)):
+                x = random.randint(0, self.grid.width-1)
+                y = random.randint(0, self.grid.height-1)
+            self.grid.place_agent(agent, (x, y))
     
     def get_customer_info(self, agents):
         customers = agents.select(agent_type=CustomerAgent)
@@ -93,13 +88,15 @@ class RestaurantModel(mesa.Model):
         for _ in range(n_new):
             if table := self.find_available_table():
                 customer = CustomerAgent(model=self)
-                customer.arrival_time = self.current_time
+                self.position([customer])
+                customer.order_time = self.current_time
                 table.add_customer(customer)
                 self.agents.add(customer)
 
     def remove_customer(self, customer):
         """Remove customer from restaurant tracking"""
         if customer in self.agents.select(agent_type=CustomerAgent):
+            self.grid.remove_agent(customer)
             self.agents.remove(customer)
 
     def step(self):

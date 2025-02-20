@@ -8,6 +8,7 @@ src/mesa_restaurant_agents/visualization.py
 src/mesa_restaurant_agents.egg-info/PKG-INFO
 src/mesa_restaurant_agents.egg-info/SOURCES.txt
 src/mesa_restaurant_agents.egg-info/dependency_links.txt
+src/mesa_restaurant_agents.egg-info/requires.txt
 src/mesa_restaurant_agents.egg-info/top_level.txt
 src/mesa_restaurant_agents/agents/__init__.py
 src/mesa_restaurant_agents/agents/customer_agent.py
