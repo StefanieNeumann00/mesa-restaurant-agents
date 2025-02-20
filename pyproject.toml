@@ -5,6 +5,8 @@ build-backend = 'setuptools.build_meta'
 [project]
 name = "mesa-restaurant-agents"
 version = "0.0.1"
+description = "A Mesa-based restaurant simulation"
+readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "mesa==3.1.0",
