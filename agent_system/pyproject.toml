@@ -1,3 +1,19 @@
 [build-system]
-requires = ['setuptools>=42']
+requires = ['setuptools>=68.2.2', "wheel"]
 build-backend = 'setuptools.build_meta'
+
+[project]
+name = "mesa-restaurant-agents"
+version = "0.0.1"
+description = "A Mesa-based restaurant simulation"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "mesa==3.1.0",
+    "pandas==2.2.3",
+    "numpy==2.2.2",
+    "scikit-learn==1.6.1",
+    "scipy==1.15.1",
+    "seaborn== 0.13.2",
+    "matplotlib==3.4.3"
+]
