@@ -11,25 +11,27 @@ class CustomerAgent(mesa.Agent):
         self.waiting_time = 0                         # Time spent waiting
         self.order_status = OrderStatus.WAITING       # Current order status
         self.order_time = None                        # Time when order was placed
-        self.satisfaction = 100                         # Overall satisfaction (0-100)
+        self.satisfaction = 100                       # Overall satisfaction (0-100)
         self.tip = 0                                  # Amount of tip given
         self.assigned_waiter = None                   # Reference to assigned waiter
 
         # Table assignment and timing
         self.table = None                             # Assigned table
-        self.arrival_time = None                      # Time customer arrived
         self.dining_duration = random.randint(60, 120) # Time to spend at restaurant
 
     def step(self):
         """Update customer state each time step (1 minute)"""
         # Increment waiting time if not served yet
-        if (self.order_status != OrderStatus.SERVED) and (self.order_status != OrderStatus.WAITING):
+        if (self.order_status != OrderStatus.SERVED):
             self.waiting_time = ((self.model.current_time - self.order_time).total_seconds() % 3600) // 60
+            self.satisfaction = max(0, 100 - (self.waiting_time * 2))  # Decrease by 2 points per minute
+            if self.waiting_time >= self.dining_duration:
+                self.leave_without_paying()
 
         # Check if customer should leave after finishing meal
         if self.table and self.order_status == OrderStatus.SERVED:
             current_time = self.model.current_time
-            if ((current_time - self.arrival_time).total_seconds() % 3600) // 60 >= self.dining_duration:
+            if ((current_time - self.order_time).total_seconds() % 3600) // 60 >= self.dining_duration:
                 self.leave_restaurant()
 
     def order_dish(self, waiter):
