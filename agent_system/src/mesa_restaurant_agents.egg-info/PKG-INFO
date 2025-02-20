@@ -1,0 +1,13 @@
+Metadata-Version: 2.2
+Name: mesa_restaurant_agents
+Version: 0.0.1
+Author: 
+Author-email: 
+Requires-Python: >=3.6
+Description-Content-Type: text/markdown
+License-File: LICENSE.txt
+Dynamic: description
+Dynamic: description-content-type
+Dynamic: requires-python
+
+# mesa-restaurant-agents

@@ -24,6 +24,7 @@ def display_mean_step_results(results):
     ax1.legend()
 
     print(plt.show())
+    return data_grouped
 
 def display_first_run_step_results(results):
     df = pd.DataFrame(results)
@@ -31,10 +32,12 @@ def display_first_run_step_results(results):
     customer_infos_dict = dict(data_first_run["Customer_Info"])
     customer_infos_list = [{**item, 'step': k} for k, v in customer_infos_dict.items() for item in v]
     customer_infos_df = pd.DataFrame(customer_infos_list)
-    plots = ['active','waiting_time','order_status','satisfaction']
+
+    plots = ['waiting_time','order_status','satisfaction']
 
     for plot in plots:
         fig = px.histogram(customer_infos_df, x="step", y=plot,
                     color='customer_nr', barmode='group',
                     height=400, nbins=len(customer_infos_df['step'].unique()))
         print(fig.show())
+    return customer_infos_df

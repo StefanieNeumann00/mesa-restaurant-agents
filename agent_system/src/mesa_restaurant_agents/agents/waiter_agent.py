@@ -1,4 +1,5 @@
 from ..utils.order_status import OrderStatus, food_options
+from ..agents.customer_agent import CustomerAgent
 import mesa
 
 class WaiterAgent(mesa.Agent):
@@ -14,7 +15,7 @@ class WaiterAgent(mesa.Agent):
         self.served_customers = 0        # Total customers served
 
     def calculate_closest_customer(self, ordered):
-        for customer in self.model.customers:
+        for customer in self.model.agents.select(agent_type=CustomerAgent):
             if customer in self.current_orders.keys() and ordered:
                 return customer
             elif customer not in self.current_orders.keys() and not ordered:
@@ -23,10 +24,12 @@ class WaiterAgent(mesa.Agent):
     def step(self):
         if self.busy:
             customer = self.calculate_closest_customer(ordered=True)
-            print(customer)
-            self.serve_dish(customer)
+            if customer:
+                self.serve_dish(customer)
         else:
-            self.take_order(self.calculate_closest_customer(ordered=False))
+            customer = self.calculate_closest_customer(ordered=False)
+            if customer:
+                self.take_order(customer)
 
     def take_order(self, customer):
         # Take order from customer if waiter is available
@@ -47,10 +50,10 @@ class WaiterAgent(mesa.Agent):
             self.busy = len(self.current_orders) > 0
             self.served_customers += 1
 
-            # Update waiter's performance metrics
-            customer.rate_experience()
-            rating = customer.rating
-            tip = customer.tip
-            self.tips += tip
-            self.ratings_count += 1
-            self.avg_rating = ((self.avg_rating * (self.ratings_count - 1)) + rating) / self.ratings_count
+    def update_performance_metrics(self, customer):
+        # Update waiter's performance metrics
+        #rating = customer.rating
+        tip = customer.tip
+        self.tips += tip
+        #self.ratings_count += 1
+        #self.avg_rating = ((self.avg_rating * (self.ratings_count - 1)) + rating) / self.ratings_count
