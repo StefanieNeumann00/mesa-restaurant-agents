@@ -93,7 +93,8 @@ class RestaurantModel(mesa.Model):
     def is_walkway(self, pos):
         """Check if a position is a walkway"""
         x, y = pos
-        return self.environment[x][y] == EnvironmentDefinition.FREE.value or self.environment[x][y] == EnvironmentDefinition.OCCUPIED.value
+        return (self.environment[x][y] == EnvironmentDefinition.FREE.value or
+                self.environment[x][y] == EnvironmentDefinition.OCCUPIED.value)
 
     def position(self, agents):
         for agent in agents:
@@ -110,11 +111,10 @@ class RestaurantModel(mesa.Model):
         customers = agents.select(agent_type=CustomerAgent)
         c_infos = []
         for customer in customers:
-            c_info = {}
-            c_info['customer_nr'] = customer.unique_id
-            c_info['waiting_time'] = customer.waiting_time
-            c_info['order_status'] = customer.order_status.value
-            c_info['satisfaction'] = customer.satisfaction
+            c_info = {"customer_nr": customer.unique_id,
+                      "waiting_time": customer.waiting_time,
+                      "order_status": customer.order_status.value,
+                      "satisfaction": customer.satisfaction}
             c_infos.append(c_info)
         return c_infos
 
@@ -122,12 +122,11 @@ class RestaurantModel(mesa.Model):
         waiters = agents.select(agent_type=WaiterAgent)
         w_infos = []
         for waiter in waiters:
-            w_info = {}
-            w_info['waiter_nr'] = waiter.unique_id
-            w_info["current_orders"] = waiter.current_orders
-            w_info["tips"] = waiter.tips
-            w_info["avg_rating"] = waiter.avg_rating
-            w_info["served_customers"] = waiter.served_customers
+            w_info = {"waiter_nr": waiter.unique_id,
+                      "current_orders": waiter.current_orders,
+                      "tips": waiter.tips,
+                      "avg_rating": waiter.avg_rating,
+                      "served_customers": waiter.served_customers}
             w_infos.append(w_info)
         return w_infos
 
@@ -163,7 +162,7 @@ class RestaurantModel(mesa.Model):
     def step(self):
         """Advance simulation by one time step"""
         # Process restaurant operations during open hours
-        if self.opening_time <= self.current_time and self.current_time <= self.closing_time:
+        if self.opening_time <= self.current_time <= self.closing_time:
             self.add_new_customers()
 
         # Collect data and execute agent steps in random order
