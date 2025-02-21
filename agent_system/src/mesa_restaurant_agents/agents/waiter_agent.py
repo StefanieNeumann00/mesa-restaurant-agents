@@ -9,10 +9,21 @@ class WaiterAgent(mesa.Agent):
         self.model = model
         self.busy = False                # Current serving status
         self.current_orders = {}         # List of (customer, order) tuples
+        self.carrying_food = []  # List of orders currently being carried
+        self.max_carry = 2  # Maximum number of food items that can be carried
         self.tips = 0                    # Total tips received
         self.avg_rating = 0              # Average rating from customers
         self.ratings_count = 0           # Number of ratings received
         self.served_customers = 0        # Total customers served
+
+    def can_pick_up_food(self):
+        return len(self.carrying_food) < self.max_carry
+
+    def pick_up_food(self, food):
+        if self.can_pick_up_food():
+            self.carrying_food.append(food)
+            return True
+        return False
 
     def calculate_closest_customer(self, ordered):
         for customer in self.model.agents.select(agent_type=CustomerAgent):
@@ -44,11 +55,20 @@ class WaiterAgent(mesa.Agent):
     def serve_dish(self, customer):
         # Serve food to customer and collect feedback
         if customer in self.current_orders.keys():
-            customer.order_status = OrderStatus.SERVED
-            # Remove served customer from current orders
-            del self.current_orders[customer]
-            self.busy = len(self.current_orders) > 0
-            self.served_customers += 1
+            order = self.current_orders[customer]
+            if order in self.carrying_food:
+                # Serve the food
+                self.carrying_food.remove(order)
+                customer.order_status = OrderStatus.SERVED
+                # Remove served customer from current orders
+                del self.current_orders[customer]
+                self.busy = len(self.current_orders) > 0
+                self.served_customers += 1
+                return True
+            elif not self.carrying_food and self.can_pick_up_food():
+                # Pick up food from kitchen if not carrying anything
+                self.pick_up_food(order)
+        return False
 
     def update_performance_metrics(self, customer):
         # Update waiter's performance metrics
