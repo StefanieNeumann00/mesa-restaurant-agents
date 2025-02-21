@@ -1,6 +1,5 @@
 import mesa
 import numpy as np
-import random
 from datetime import datetime, timedelta
 import random
 
