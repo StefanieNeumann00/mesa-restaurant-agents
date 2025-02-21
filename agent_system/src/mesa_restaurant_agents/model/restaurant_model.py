@@ -14,17 +14,27 @@ class RestaurantModel(mesa.Model):
     def __init__(self, n_waiters, grid_width, grid_height, seed=None):
         super().__init__(seed=seed)
 
+        self.grid_height = grid_height if grid_height % 2 == 0 else grid_height+1 # make sure grid_height is uneven
+        self.grid_width = grid_width if grid_width % 2 == 0 else grid_width+1 # make sure grid_width is uneven
         self.opening_time = datetime.strptime("11:00", "%H:%M")
         self.closing_time = datetime.strptime("23:00", "%H:%M")
         self.current_time = self.opening_time
         self.time_step = 5            # Each step represents 5 minutes
 
-        # Create agents
-        self.tables = [Table(i) for i in range(100)]  # Create 100 tables
         WaiterAgent.create_agents(model=self, n=n_waiters)
         ManagerAgent.create_agents(model=self, n=1)
 
-        self.grid = mesa.space.MultiGrid(grid_width, grid_height, True)
+        self.grid = mesa.space.MultiGrid(self.grid_width, self.grid_height, True)
+        self.tables = np.zeros((self.grid_width, self.grid_height))
+
+        for x in range(len(self.tables)):
+            for y in range(len(self.tables[x])):
+                if y % 2 != 0 and x % 2 != 0 and x != self.grid_width-1 and y!= self.grid_height-1:
+                    if x == self.grid_width-2 and y== self.grid_height-2:
+                        self.tables[x][y] = 2
+                    else:
+                        self.tables[x][y] = 1
+
         self.position(self.agents)
 
         # Set up data collection for model metrics
@@ -44,7 +54,7 @@ class RestaurantModel(mesa.Model):
             self.grid.empties
             x = random.randint(0, self.grid.width-1)
             y = random.randint(0, self.grid.height-1)
-            while not self.grid.is_cell_empty((x,y)):
+            while not self.grid.is_cell_empty((x,y)) and self.tables[x][y] == 0:
                 x = random.randint(0, self.grid.width-1)
                 y = random.randint(0, self.grid.height-1)
             self.grid.place_agent(agent, (x, y))
@@ -67,7 +77,6 @@ class RestaurantModel(mesa.Model):
         for waiter in waiters:
             w_info = {}
             w_info['waiter_nr'] = waiter.unique_id
-            w_info["busy"] = 1 if waiter.busy else 0
             w_info["current_orders"] = waiter.current_orders
             w_info["tips"] = waiter.tips
             w_info["avg_rating"] = waiter.avg_rating
@@ -90,21 +99,13 @@ class RestaurantModel(mesa.Model):
             base_rate = 5  # Increased arrival rate during peak hours
         return np.random.poisson(base_rate)  # Random variation in arrivals
 
-    def find_available_table(self):
-        """Find a random table with available seats"""
-        available_tables = [t for t in self.tables if t.is_available()]
-        return random.choice(available_tables) if available_tables else None
-
     def add_new_customers(self):
-        """Add new customers to the restaurant if tables are available"""
         n_new = self.calculate_new_customers()
         for _ in range(n_new):
-            if table := self.find_available_table():
-                customer = CustomerAgent(model=self)
-                self.position([customer])
-                customer.order_time = self.current_time
-                table.add_customer(customer)
-                self.agents.add(customer)
+            customer = CustomerAgent(model=self)
+            customer.order_time = self.current_time
+            self.agents.add(customer)
+            self.position([customer])
 
     def remove_customer(self, customer):
         """Remove customer from restaurant tracking"""
@@ -114,16 +115,16 @@ class RestaurantModel(mesa.Model):
 
     def step(self):
         """Advance simulation by one time step"""
-        # Update time
-        self.current_time += timedelta(minutes=self.time_step)
-
         # Process restaurant operations during open hours
-        if self.opening_time <= self.current_time <= self.closing_time:
+        if self.opening_time <= self.current_time and self.current_time <= self.closing_time:
             self.add_new_customers()
 
         # Collect data and execute agent steps in random order
         self.datacollector.collect(self)
         self.agents.shuffle_do("step")
+
+        # Update time
+        self.current_time += timedelta(minutes=self.time_step)
 
         # Check closing time
         if self.current_time >= self.closing_time:

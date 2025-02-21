@@ -22,7 +22,7 @@ class ManagerAgent(mesa.Agent):
         # Update daily statistics
         model = self.model
         self.daily_stats['total_customers'] = len(model.agents.select(agent_type=CustomerAgent))
-        self.daily_stats['active_waiters'] = len([w for w in model.agents.select(agent_type=WaiterAgent) if not w.busy])
+        self.daily_stats['active_waiters'] = len([w for w in model.agents.select(agent_type=WaiterAgent)])
         self.daily_stats['avg_waiting_time'] = np.mean([c.waiting_time for c in model.agents.select(agent_type=CustomerAgent)])
 
     def order_food(self, food_type, amount):

@@ -50,7 +50,7 @@ def display_first_run_step_results_waiter(results):
     waiter_infos_list = [{**item, 'step': k} for k, v in waiter_infos_dict.items() for item in v]
     waiter_infos_df = pd.DataFrame(waiter_infos_list)
 
-    plots = ['busy','tips','avg_rating', 'served_customers']
+    plots = ['tips','avg_rating', 'served_customers']
 
     for plot in plots:
         fig = px.histogram(waiter_infos_df, x="step", y=plot,

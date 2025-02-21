@@ -8,19 +8,16 @@ class CustomerAgent(mesa.Agent):
         # Initialize customer properties
         self.food_preference = random.choice(list(food_options.keys()))
         self.bill = food_options[self.food_preference]["price"]    # Amount to pay for food
-        self.waiting_time = self.model.current_time                # Time spent waiting
+        self.waiting_time = 0                # Time spent waiting
         self.order_status = OrderStatus.ORDERED       # Current order status
         self.order_time = None                        # Time when order was placed
         self.satisfaction = 100                       # Overall satisfaction (0-100)
         self.tip = 0                                  # Amount of tip given
         self.assigned_waiter = []                   # Reference to assigned waiter
-
-        # Table assignment and timing
-        self.table = None                             # Assigned table
         self.dining_duration = random.randint(60, 120)  # Time to spend at restaurant
 
     def step(self):
-        """Update customer state each time step (1 minute)"""
+        """Update customer state each time step (5 minutes)"""
         # Increment waiting time if not served yet
         if self.order_status != OrderStatus.SERVED:
             self.waiting_time = ((self.model.current_time - self.order_time).total_seconds() % 3600) // 60
@@ -29,7 +26,7 @@ class CustomerAgent(mesa.Agent):
                 self.leave_without_paying()
 
         # Check if customer should leave after finishing meal
-        if self.table and self.order_status == OrderStatus.SERVED:
+        if self.order_status == OrderStatus.SERVED:
             current_time = self.model.current_time
             if ((current_time - self.order_time).total_seconds() % 3600) // 60 >= self.dining_duration:
                 self.leave_restaurant()
@@ -62,23 +59,15 @@ class CustomerAgent(mesa.Agent):
 
     def leave_without_paying(self):
         """Leave restaurant due to excessive waiting time"""
-        if self.table:
-            if self.assigned_waiter:
-                self.assigned_waiter.current_orders = [
-                    (c, o) for c, o in self.assigned_waiter.current_orders
-                    if c != self
-                ]
-            self.satisfaction = 0
-            self.tip = 0
-            self.table.remove_customer(self)
-            self.model.remove_customer(self)
+        self.satisfaction = 0
+        self.tip = 0
+        self.model.remove_customer(self)
 
     def leave_restaurant(self):
         """Leave restaurant after dining"""
-        if self.table:
-            payment = self.rate_and_pay()
-            if self.assigned_waiter:
-                self.assigned_waiter.process_payment(self, payment)
-            self.table.remove_customer(self)
-            self.model.remove_customer(self)
-            self.assigned_waiter.update_performance_metrics(self)
+        payment = self.rate_and_pay()
+        cooperate = True if len(self.assigned_waiter) > 1 else False
+        for waiter in self.assigned_waiter:
+            self.waiter.process_payment(self, payment)
+        self.model.remove_customer(self)
+        self.assigned_waiter.update_performance_metrics(self)
