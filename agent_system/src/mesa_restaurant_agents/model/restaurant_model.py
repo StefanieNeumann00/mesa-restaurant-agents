@@ -6,15 +6,14 @@ import random
 from ..agents.customer_agent import CustomerAgent
 from ..agents.manager_agent import ManagerAgent
 from ..agents.waiter_agent import WaiterAgent
-
-from ..utils.table import Table
+from ..utils.environment_definition import EnvironmentDefinition
 
 class RestaurantModel(mesa.Model):
     def __init__(self, n_waiters, grid_width, grid_height, seed=None):
         super().__init__(seed=seed)
 
-        self.grid_height = grid_height if grid_height % 2 == 0 else grid_height+1 # make sure grid_height is uneven
-        self.grid_width = grid_width if grid_width % 2 == 0 else grid_width+1 # make sure grid_width is uneven
+        self.grid_height = grid_height if grid_height % 2 != 0 else grid_height+1 # make sure grid_height is uneven
+        self.grid_width = grid_width if grid_width % 2 != 0 else grid_width+1 # make sure grid_width is uneven
         self.opening_time = datetime.strptime("11:00", "%H:%M")
         self.closing_time = datetime.strptime("23:00", "%H:%M")
         self.current_time = self.opening_time
@@ -24,15 +23,15 @@ class RestaurantModel(mesa.Model):
         ManagerAgent.create_agents(model=self, n=1)
 
         self.grid = mesa.space.MultiGrid(self.grid_width, self.grid_height, True)
-        self.tables = np.zeros((self.grid_width, self.grid_height))
+        self.environment = np.zeros((self.grid_width, self.grid_height))
 
-        for x in range(len(self.tables)):
-            for y in range(len(self.tables[x])):
+        for x in range(len(self.environment)):
+            for y in range(len(self.environment[x])):
                 if y % 2 != 0 and x % 2 != 0 and x != self.grid_width-1 and y!= self.grid_height-1:
                     if x == self.grid_width-2 and y== self.grid_height-2:
-                        self.tables[x][y] = 2
+                        self.environment[x][y] = EnvironmentDefinition.KITCHEN.value
                     else:
-                        self.tables[x][y] = 1
+                        self.environment[x][y] = EnvironmentDefinition.FREE_TABLE.value
 
         self.position(self.agents)
 
@@ -48,15 +47,38 @@ class RestaurantModel(mesa.Model):
             }
         )
 
+    def get_free_positions(self, agent):
+        free_positions = []
+        if isinstance(agent, CustomerAgent):
+            for x in range(len(self.environment)):
+                for y in range(len(self.environment[x])):
+                    if self.environment[x][y] == EnvironmentDefinition.FREE_TABLE.value:
+                        free_positions.append((x,y))
+        else:
+            for x in range(len(self.environment)):
+                for y in range(len(self.environment[x])):
+                    if self.environment[x][y] == EnvironmentDefinition.FREE.value:
+                        free_positions.append((x,y))
+        return free_positions
+
+    def set_occupied(self, pos):
+        x = pos[0]
+        y = pos[1]
+        if self.environment[x][y] == EnvironmentDefinition.FREE.value:
+            self.environment[x][y] = EnvironmentDefinition.OCCUPIED.value
+        elif self.environment[x][y] == EnvironmentDefinition.FREE_TABLE.value:
+            self.environment[x][y] = EnvironmentDefinition.OCCUPIED_TABLE.value
+
     def position(self, agents):
         for agent in agents:
-            self.grid.empties
-            x = random.randint(0, self.grid.width-1)
-            y = random.randint(0, self.grid.height-1)
-            while not self.grid.is_cell_empty((x,y)) and self.tables[x][y] == 0:
-                x = random.randint(0, self.grid.width-1)
-                y = random.randint(0, self.grid.height-1)
-            self.grid.place_agent(agent, (x, y))
+            free_positions = self.get_free_positions(agent)
+            if len(free_positions) > 0:
+                index = random.randint(0, len(free_positions)-1)
+                pos = free_positions[index]
+                self.grid.place_agent(agent, pos)
+                self.set_occupied(pos)
+            else:
+                self.agents.remove(agent)
     
     def get_customer_info(self, agents):
         customers = agents.select(agent_type=CustomerAgent)

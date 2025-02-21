@@ -75,8 +75,8 @@ class WaiterAgent(mesa.Agent):
     def step(self):
         if self.carrying_food:  # Have food to deliver
             # Find target customer's table position
-            customer = self.calculate_closest_customer(ordered=True)
-            if customer and customer.table:
+            customer = self.get_best_customer()
+            if customer:
                 table_pos = customer.pos
                 self.target_pos = table_pos
 
@@ -100,7 +100,7 @@ class WaiterAgent(mesa.Agent):
                 self.move()
 
         else:  # Look for customers to serve
-            customer = self.calculate_closest_customer(ordered=False)
+            customer = self.get_best_customer()
             if customer:
                 table_pos = customer.pos
                 self.target_pos = table_pos
