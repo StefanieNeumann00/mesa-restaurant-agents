@@ -8,12 +8,12 @@ class CustomerAgent(mesa.Agent):
         # Initialize customer properties
         self.food_preference = random.choice(list(food_options.keys()))
         self.bill = food_options[self.food_preference]["price"]    # Amount to pay for food
-        self.waiting_time = 0                # Time spent waiting
+        self.waiting_time = 0                         # Time spent waiting
         self.order_status = OrderStatus.ORDERED       # Current order status
         self.order_time = None                        # Time when order was placed
         self.satisfaction = 100                       # Overall satisfaction (0-100)
         self.tip = 0                                  # Amount of tip given
-        self.assigned_waiter = []                   # Reference to assigned waiter
+        self.assigned_waiter = []                     # Reference to assigned waiter
         self.dining_duration = random.randint(60, 120)  # Time to spend at restaurant
 
     def step(self):
@@ -66,8 +66,6 @@ class CustomerAgent(mesa.Agent):
     def leave_restaurant(self):
         """Leave restaurant after dining"""
         payment = self.rate_and_pay()
-        cooperate = True if len(self.assigned_waiter) > 1 else False
-        for waiter in self.assigned_waiter:
-            self.waiter.process_payment(self, payment)
+        self.waiter.process_payment(self, payment)
         self.model.remove_customer(self)
         self.assigned_waiter.update_performance_metrics(self)
