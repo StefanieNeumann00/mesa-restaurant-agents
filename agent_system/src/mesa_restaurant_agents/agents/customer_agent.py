@@ -7,13 +7,13 @@ class CustomerAgent(mesa.Agent):
         super().__init__(model)
         # Initialize customer properties
         self.food_preference = random.choice(list(food_options.keys()))
-        self.bill = 0                                 # Amount to pay for food
-        self.waiting_time = 0                         # Time spent waiting
-        self.order_status = OrderStatus.WAITING       # Current order status
+        self.bill = food_options[self.food_preference]["price"]    # Amount to pay for food
+        self.waiting_time = self.model.current_time                # Time spent waiting
+        self.order_status = OrderStatus.ORDERED       # Current order status
         self.order_time = None                        # Time when order was placed
         self.satisfaction = 100                       # Overall satisfaction (0-100)
         self.tip = 0                                  # Amount of tip given
-        self.assigned_waiter = None                   # Reference to assigned waiter
+        self.assigned_waiter = []                   # Reference to assigned waiter
 
         # Table assignment and timing
         self.table = None                             # Assigned table
@@ -33,16 +33,6 @@ class CustomerAgent(mesa.Agent):
             current_time = self.model.current_time
             if ((current_time - self.order_time).total_seconds() % 3600) // 60 >= self.dining_duration:
                 self.leave_restaurant()
-
-    def order_dish(self, waiter):
-        # Place order and calculate bill with waiter if not already ordered
-        if self.order_status == OrderStatus.WAITING:
-            self.order_status = OrderStatus.ORDERED
-            self.assigned_waiter = waiter
-            self.bill = food_options[self.food_preference]["price"]
-            self.order_time = self.model.current_time
-            return self.food_preference
-        return None
 
     def calculate_tip(self):
         """Calculate tip based on waiting time"""
