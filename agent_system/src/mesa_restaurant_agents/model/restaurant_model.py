@@ -7,6 +7,7 @@ from ..agents.customer_agent import CustomerAgent
 from ..agents.manager_agent import ManagerAgent
 from ..agents.waiter_agent import WaiterAgent
 from ..utils.environment_definition import EnvironmentDefinition
+from ..utils.kitchen import Kitchen
 
 class RestaurantModel(mesa.Model):
 
@@ -23,11 +24,11 @@ class RestaurantModel(mesa.Model):
         WaiterAgent.create_agents(model=self, n=n_waiters)
         ManagerAgent.create_agents(model=self, n=1)
 
-        self.grid = mesa.space.MultiGrid(self.grid_width, self.grid_height, True)
+        self.grid = mesa.space.SingleGrid(self.grid_width, self.grid_height, True)
         self.environment = np.zeros((self.grid_width, self.grid_height))
-        self.kitchen_pos = (self.grid_width - 2, self.grid_height-2)
+        self.kitchen = Kitchen(pos = (self.grid_width - 2, self.grid_height-2))
         self.layout = {
-            'kitchen': self.kitchen_pos,
+            'kitchen': self.kitchen.pos,
             'walkways': set(),
             'tables': set()
         }
@@ -47,7 +48,9 @@ class RestaurantModel(mesa.Model):
                 "Profit": lambda m: np.mean(
                     [ma.daily_stats['profit'] for ma in m.agents.select(agent_type=ManagerAgent)]),
                 "Customer_Info": lambda m: self.get_customer_info(m.agents),
-                "Waiter_Info": lambda m: self.get_waiter_info(m.agents)
+                "Waiter_Info": lambda m: self.get_waiter_info(m.agents),
+                "Environment": lambda m: m.environment,
+                "Grid": lambda m: m.grid
             }
         )
 
@@ -76,7 +79,7 @@ class RestaurantModel(mesa.Model):
     def _setup_restaurant_layout(self):
         """Initialize the restaurant layout with tables, kitchen, and walkways"""
         # Set kitchen location
-        self.environment[self.kitchen_pos[0]][self.kitchen_pos[1]] = EnvironmentDefinition.KITCHEN.value
+        self.environment[self.kitchen.pos[0]][self.kitchen.pos[1]] = EnvironmentDefinition.KITCHEN.value
 
         # Set tables and walkways
         for x in range(self.grid_width):
@@ -84,7 +87,7 @@ class RestaurantModel(mesa.Model):
                 pos = (x, y)
                 # Tables are placed on odd coordinates, not on edges
                 if (y % 2 != 0 and x % 2 != 0 and
-                        x != self.grid_width - 1 and y != self.grid_height - 1 and (x,y) != self.kitchen_pos):
+                        x != self.grid_width - 1 and y != self.grid_height - 1 and (x,y) != self.kitchen.pos):
                     self.environment[x][y] = EnvironmentDefinition.FREE_TABLE.value
                     self.layout['tables'].add(pos)
                 else:
@@ -123,7 +126,6 @@ class RestaurantModel(mesa.Model):
         w_infos = []
         for waiter in waiters:
             w_info = {"waiter_nr": waiter.unique_id,
-                      "current_orders": waiter.current_orders,
                       "tips": waiter.tips,
                       "avg_rating": waiter.avg_rating,
                       "served_customers": waiter.served_customers}
@@ -152,6 +154,7 @@ class RestaurantModel(mesa.Model):
             customer.order_time = self.current_time
             self.agents.add(customer)
             self.position([customer])
+            self.kitchen.add_new_customer_order(customer, customer.food_preference, customer.order_time)
 
     def remove_customer(self, customer):
         """Remove customer from restaurant tracking"""
@@ -164,6 +167,8 @@ class RestaurantModel(mesa.Model):
         # Process restaurant operations during open hours
         if self.opening_time <= self.current_time <= self.closing_time:
             self.add_new_customers()
+
+        self.kitchen.add_ready_orders_to_prepared(self.current_time)
 
         # Collect data and execute agent steps in random order
         self.datacollector.collect(self)

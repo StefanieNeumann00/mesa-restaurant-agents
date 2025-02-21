@@ -7,8 +7,6 @@ class WaiterAgent(mesa.Agent):
         super().__init__(model)
         # Initialize waiter properties
         self.model = model            # Current serving status
-        self.busy = False
-        self.current_orders = {}         # List of (customer, order) tuples
         self.carrying_food = []  # List of orders currently being carried
         self.max_carry = 2       # Maximum number of food items that can be carried
         self.tips = 0                    # Total tips received
@@ -88,17 +86,18 @@ class WaiterAgent(mesa.Agent):
                 else:
                     self.move()
 
-        elif self.current_orders:  # Need to get food from kitchen
+        else:  # Need to get food from kitchen
             self.target_pos = self.get_kitchen_pos()
 
             # If at kitchen, pick up food
             if self.pos == self.get_kitchen_pos():
-                for customer, order in self.current_orders.items():
+                for customer, order in self.model.kitchen.prepared_orders.items():
                     if self.can_pick_up_food():
                         self.pick_up_food(order)
             else:
                 self.move()
 
+        '''
         else:  # Look for customers to serve
             customer = self.get_best_customer()
             if customer:
@@ -112,6 +111,7 @@ class WaiterAgent(mesa.Agent):
                     self.take_order(customer)
                 else:
                     self.move()
+        '''
 
     def serve_dish(self, customer):
         customer.order_status = OrderStatus.SERVED
