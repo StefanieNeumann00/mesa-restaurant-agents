@@ -42,7 +42,7 @@ class CustomerAgent(mesa.Agent):
         if self.waiting_time <= 10:
             tip_rate = base_tip_rate
         elif self.waiting_time >= 30:
-            tip_rate = 0
+            tip_rate = 0.02
         else:
             # Decrease by 1% per minute after 10 minutes
             tip_rate = base_tip_rate - (1 * (self.waiting_time - 20))
