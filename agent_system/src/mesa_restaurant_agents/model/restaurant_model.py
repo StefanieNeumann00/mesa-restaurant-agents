@@ -34,7 +34,8 @@ class RestaurantModel(mesa.Model):
                 "Average_Wait_Time": lambda m: np.mean([c.waiting_time for c in m.agents.select(agent_type=CustomerAgent)]),
                 "Average_Customer_Satisfaction": lambda m: np.mean([c.satisfaction for c in m.agents.select(agent_type=CustomerAgent)]),
                 "Profit": lambda m: np.mean([ma.daily_stats['profit'] for ma in m.agents.select(agent_type=ManagerAgent)]),
-                "Customer_Info": lambda m: self.get_customer_info(m.agents)
+                "Customer_Info": lambda m: self.get_customer_info(m.agents),
+                "Waiter_Info": lambda m: self.get_waiter_info(m.agents)
             }
         )
 
@@ -51,16 +52,28 @@ class RestaurantModel(mesa.Model):
     def get_customer_info(self, agents):
         customers = agents.select(agent_type=CustomerAgent)
         c_infos = []
-        c_nr = 0
         for customer in customers:
             c_info = {}
-            c_info['customer_nr'] = c_nr
+            c_info['customer_nr'] = customer.unique_id
             c_info['waiting_time'] = customer.waiting_time
             c_info['order_status'] = customer.order_status.value
             c_info['satisfaction'] = customer.satisfaction
             c_infos.append(c_info)
-            c_nr += 1
         return c_infos
+    
+    def get_waiter_info(self, agents):
+        waiters = agents.select(agent_type=WaiterAgent)
+        w_infos = []
+        for waiter in waiters:
+            w_info = {}
+            w_info['waiter_nr'] = waiter.unique_id
+            w_info["busy"] = 1 if waiter.busy else 0
+            w_info["current_orders"] = waiter.current_orders
+            w_info["tips"] = waiter.tips
+            w_info["avg_rating"] = waiter.avg_rating
+            w_info["served_customers"] = waiter.served_customers
+            w_infos.append(w_info)
+        return w_infos
 
     def get_customers_count(self, agents):
         return len(agents.select(agent_type=CustomerAgent))

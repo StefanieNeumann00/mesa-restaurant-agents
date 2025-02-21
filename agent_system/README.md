@@ -17,7 +17,7 @@ This project simulates a restaurant environment using the Mesa agent-based model
 * Navigate to directory containing pyproject.toml (agents_system/)
 * Execute `python -m build`
 * Restart kernel
-* Install build package with `pip install --force-reinstall <dir to whl file>.whl` (The whl-file is created in the dist/ folder)
+* Install build package with `pip install --force-reinstall <dir to whl file>.whl` (The whl-file is created in the dist/-folder)
 
 ## Installation
 

@@ -26,7 +26,7 @@ def display_mean_step_results(results):
     print(plt.show())
     return data_grouped
 
-def display_first_run_step_results(results):
+def display_first_run_step_results_customer(results):
     df = pd.DataFrame(results)
     data_first_run = df[df["RunId"]==0]
     customer_infos_dict = dict(data_first_run["Customer_Info"])
@@ -41,3 +41,20 @@ def display_first_run_step_results(results):
                     height=400, nbins=len(customer_infos_df['step'].unique()))
         print(fig.show())
     return customer_infos_df
+
+
+def display_first_run_step_results_waiter(results):
+    df = pd.DataFrame(results)
+    data_first_run = df[df["RunId"]==0]
+    waiter_infos_dict = dict(data_first_run["Waiter_Info"])
+    waiter_infos_list = [{**item, 'step': k} for k, v in waiter_infos_dict.items() for item in v]
+    waiter_infos_df = pd.DataFrame(waiter_infos_list)
+
+    plots = ['busy','tips','avg_rating', 'served_customers']
+
+    for plot in plots:
+        fig = px.histogram(waiter_infos_df, x="step", y=plot,
+                    color='waiter_nr', barmode='group',
+                    height=400, nbins=len(waiter_infos_df['step'].unique()))
+        print(fig.show())
+    return waiter_infos_df
