@@ -45,7 +45,7 @@ class CustomerAgent(mesa.Agent):
             tip_rate = 0.02
         else:
             # Decrease by 1% per minute after 10 minutes
-            tip_rate = base_tip_rate - (1 * (self.waiting_time - 20))
+            tip_rate = base_tip_rate - (1 * (self.waiting_time - 18))
 
         return round(self.bill * tip_rate, 2)
 
