@@ -9,6 +9,11 @@ from ..agents.waiter_agent import WaiterAgent
 from ..utils.environment_definition import EnvironmentDefinition
 
 class RestaurantModel(mesa.Model):
+    # Cell type constants
+    WALKWAY = 0
+    TABLE = 1
+    KITCHEN = 2
+
     def __init__(self, n_waiters, grid_width, grid_height, seed=None):
         super().__init__(seed=seed)
 
@@ -17,21 +22,21 @@ class RestaurantModel(mesa.Model):
         self.opening_time = datetime.strptime("11:00", "%H:%M")
         self.closing_time = datetime.strptime("23:00", "%H:%M")
         self.current_time = self.opening_time
-        self.time_step = 5            # Each step represents 5 minutes
+        self.time_step = 5  # Each step represents 5 minutes
 
         WaiterAgent.create_agents(model=self, n=n_waiters)
         ManagerAgent.create_agents(model=self, n=1)
 
         self.grid = mesa.space.MultiGrid(self.grid_width, self.grid_height, True)
         self.environment = np.zeros((self.grid_width, self.grid_height))
+        self.kitchen_pos = (self.grid_width - 2, self.grid_height-2)
+        self.layout = {
+            'kitchen': self.kitchen_pos,
+            'walkways': set(),
+            'tables': set()
+        }
 
-        for x in range(len(self.environment)):
-            for y in range(len(self.environment[x])):
-                if y % 2 != 0 and x % 2 != 0 and x != self.grid_width-1 and y!= self.grid_height-1:
-                    if x == self.grid_width-2 and y== self.grid_height-2:
-                        self.environment[x][y] = EnvironmentDefinition.KITCHEN.value
-                    else:
-                        self.environment[x][y] = EnvironmentDefinition.FREE_TABLE.value
+        self._setup_restaurant_layout()
 
         self.position(self.agents)
 
@@ -39,9 +44,12 @@ class RestaurantModel(mesa.Model):
         self.datacollector = mesa.DataCollector(
             model_reporters={
                 "Customer_Count": lambda m: self.get_customers_count(m.agents),
-                "Average_Wait_Time": lambda m: np.mean([c.waiting_time for c in m.agents.select(agent_type=CustomerAgent)]),
-                "Average_Customer_Satisfaction": lambda m: np.mean([c.satisfaction for c in m.agents.select(agent_type=CustomerAgent)]),
-                "Profit": lambda m: np.mean([ma.daily_stats['profit'] for ma in m.agents.select(agent_type=ManagerAgent)]),
+                "Average_Wait_Time": lambda m: np.mean(
+                    [c.waiting_time for c in m.agents.select(agent_type=CustomerAgent)]),
+                "Average_Customer_Satisfaction": lambda m: np.mean(
+                    [c.satisfaction for c in m.agents.select(agent_type=CustomerAgent)]),
+                "Profit": lambda m: np.mean(
+                    [ma.daily_stats['profit'] for ma in m.agents.select(agent_type=ManagerAgent)]),
                 "Customer_Info": lambda m: self.get_customer_info(m.agents),
                 "Waiter_Info": lambda m: self.get_waiter_info(m.agents)
             }
@@ -69,6 +77,28 @@ class RestaurantModel(mesa.Model):
         elif self.environment[x][y] == EnvironmentDefinition.FREE_TABLE.value:
             self.environment[x][y] = EnvironmentDefinition.OCCUPIED_TABLE.value
 
+    def _setup_restaurant_layout(self):
+        """Initialize the restaurant layout with tables, kitchen, and walkways"""
+        # Set kitchen location
+        self.environment[self.kitchen_pos[0]][self.kitchen_pos[1]] = self.KITCHEN
+
+        # Set tables and walkways
+        for x in range(self.grid_width):
+            for y in range(self.grid_height):
+                pos = (x, y)
+                # Tables are placed on odd coordinates, not on edges
+                if (y % 2 != 0 and x % 2 != 0 and
+                        x != self.grid_width - 1 and y != self.grid_height - 1):
+                    self.environment[x][y] = EnvironmentDefinition.FREE_TABLE.value
+                    self.layout['tables'].add(pos)
+                elif pos != self.kitchen_pos:
+                    self.layout['walkways'].add(pos)
+
+    def is_walkway(self, pos):
+        """Check if a position is a walkway"""
+        x, y = pos
+        return self.environment[x][y] == EnvironmentDefinition.FREE.value or self.environment[x][y] == EnvironmentDefinition.OCCUPIED.value
+
     def position(self, agents):
         for agent in agents:
             free_positions = self.get_free_positions(agent)
@@ -91,7 +121,7 @@ class RestaurantModel(mesa.Model):
             c_info['satisfaction'] = customer.satisfaction
             c_infos.append(c_info)
         return c_infos
-    
+
     def get_waiter_info(self, agents):
         waiters = agents.select(agent_type=WaiterAgent)
         w_infos = []
