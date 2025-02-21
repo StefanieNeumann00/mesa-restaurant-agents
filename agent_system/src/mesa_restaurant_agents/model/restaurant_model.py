@@ -30,6 +30,11 @@ class RestaurantModel(mesa.Model):
         self.grid = mesa.space.MultiGrid(self.grid_width, self.grid_height, True)
         self.tables = np.zeros((self.grid_width, self.grid_height))
         self.kitchen_pos = (self.grid_width - 2, 1)
+        self.layout = {
+            'kitchen': self.kitchen_pos,
+            'walkways': set(),
+            'tables': set()
+        }
 
         self._setup_restaurant_layout()
 
@@ -58,11 +63,14 @@ class RestaurantModel(mesa.Model):
         # Set tables and walkways
         for x in range(self.grid_width):
             for y in range(self.grid_height):
+                pos = (x, y)
                 # Tables are placed on odd coordinates, not on edges
                 if (y % 2 != 0 and x % 2 != 0 and
                         x != self.grid_width - 1 and y != self.grid_height - 1):
                     self.tables[x][y] = self.TABLE
-                # All other cells are walkways (already 0 by default)
+                    self.layout['tables'].add(pos)
+                elif pos != self.kitchen_pos:
+                    self.layout['walkways'].add(pos)
 
     def is_walkway(self, pos):
         """Check if a position is a walkway"""
