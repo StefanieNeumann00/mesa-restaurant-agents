@@ -12,5 +12,5 @@ food_options = {
 class OrderStatus(Enum):
     WAITING = 0    # Customer hasn't ordered yet
     ORDERED = 1    # Order has been placed
-    PREPARING = 2  # Food is being prepared
+    DELIVERING = 2  # Food is being delivered
     SERVED = 3     # Food has been delivered

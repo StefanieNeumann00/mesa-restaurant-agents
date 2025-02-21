@@ -18,5 +18,6 @@ src/mesa_restaurant_agents/model/__init__.py
 src/mesa_restaurant_agents/model/restaurant_model.py
 src/mesa_restaurant_agents/utils/__init__.py
 src/mesa_restaurant_agents/utils/environment_definition.py
+src/mesa_restaurant_agents/utils/kitchen.py
 src/mesa_restaurant_agents/utils/order_status.py
 src/mesa_restaurant_agents/utils/shift.py
