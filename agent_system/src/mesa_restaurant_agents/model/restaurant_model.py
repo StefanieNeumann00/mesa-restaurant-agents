@@ -1,6 +1,5 @@
 import mesa
 import numpy as np
-from datetime import datetime, timedelta
 import random
 
 from ..agents.customer_agent import CustomerAgent
@@ -16,10 +15,11 @@ class RestaurantModel(mesa.Model):
 
         self.grid_height = grid_height if grid_height % 2 != 0 else grid_height+1 # make sure grid_height is uneven
         self.grid_width = grid_width if grid_width % 2 != 0 else grid_width+1 # make sure grid_width is uneven
-        self.opening_time = datetime.strptime("11:00", "%H:%M")
-        self.closing_time = datetime.strptime("23:00", "%H:%M")
-        self.current_time = self.opening_time
-        self.time_step = 5  # Each step represents 5 minutes
+        # Convert times to minutes since opening
+        self.opening_hour = 11 * 60  # 11:00 in minutes
+        self.closing_hour = 23 * 60  # 23:00 in minutes
+        self.time_step = 5  # minutes per step
+        self.current_minute = self.opening_hour  # Start at opening time
 
         WaiterAgent.create_agents(model=self, n=n_waiters)
         ManagerAgent.create_agents(model=self, n=1)
@@ -53,6 +53,12 @@ class RestaurantModel(mesa.Model):
                 "Grid": lambda m: m.grid
             }
         )
+
+    def get_current_time(self):
+        """Convert current minutes to datetime for display"""
+        hours = self.current_minute // 60
+        minutes = self.current_minute % 60
+        return f"{hours:02d}:{minutes:02d}"
 
     def get_free_positions(self, agent):
         free_positions = []
@@ -137,7 +143,7 @@ class RestaurantModel(mesa.Model):
 
     def is_peak_hour(self):
         """Check if current time is during peak hours"""
-        hour = self.current_time.hour
+        hour = self.current_minute // 60
         return (12 <= hour <= 14) or (17 <= hour <= 20)
 
     def calculate_new_customers(self):
@@ -151,7 +157,7 @@ class RestaurantModel(mesa.Model):
         n_new = self.calculate_new_customers()
         for _ in range(n_new):
             customer = CustomerAgent(model=self)
-            customer.order_time = self.current_time
+            customer.order_time = self.current_minute
             self.agents.add(customer)
             self.position([customer])
             self.kitchen.add_new_customer_order(customer, customer.food_preference, customer.order_time)
@@ -165,18 +171,18 @@ class RestaurantModel(mesa.Model):
     def step(self):
         """Advance simulation by one time step"""
         # Process restaurant operations during open hours
-        if self.opening_time <= self.current_time <= self.closing_time:
+        if self.opening_hour <= self.current_minute <= self.closing_hour:
             self.add_new_customers()
 
-        self.kitchen.add_ready_orders_to_prepared(self.current_time)
+        self.kitchen.add_ready_orders_to_prepared(self.current_minute)
 
         # Collect data and execute agent steps in random order
         self.datacollector.collect(self)
         self.agents.shuffle_do("step")
 
         # Update time
-        self.current_time += timedelta(minutes=self.time_step)
+        self.current_minute += self.time_step
 
         # Check closing time
-        if self.current_time >= self.closing_time:
+        if self.current_minute >= self.closing_hour:
             self.running = False

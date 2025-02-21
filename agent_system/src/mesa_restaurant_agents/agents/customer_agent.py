@@ -10,7 +10,7 @@ class CustomerAgent(mesa.Agent):
         self.bill = food_options[self.food_preference]["price"]    # Amount to pay for food
         self.waiting_time = 0                         # Time spent waiting
         self.order_status = OrderStatus.ORDERED       # Current order status
-        self.order_time = None                        # Time when order was placed
+        self.order_minute = model.current_minute      # Step when order was placed
         self.satisfaction = 100                       # Overall satisfaction (0-100)
         self.tip = 0                                  # Amount of tip given
         self.assigned_waiter = []                     # Reference to assigned waiter
@@ -20,23 +20,29 @@ class CustomerAgent(mesa.Agent):
         """Update customer state each time step (5 minutes)"""
         # Increment waiting time if not served yet
         if self.order_status != OrderStatus.SERVED:
-            self.waiting_time = ((self.model.current_time - self.order_time).total_seconds() % 3600) // 60
+            self.waiting_time = self.model.current_minute - self.order_minute
             self.satisfaction = max(0, 100 - (self.waiting_time * 2))  # Decrease by 2 points per minute
             if self.waiting_time >= self.dining_duration:
                 self.leave_without_paying()
 
         # Check if customer should leave after finishing meal
         if self.order_status == OrderStatus.SERVED:
-            current_time = self.model.current_time
-            if ((current_time - self.order_time).total_seconds() % 3600) // 60 >= self.dining_duration:
+            time_spent = self.model.current_minute - self.order_minute
+            if time_spent >= self.dining_duration:
                 self.leave_restaurant()
+
+    def calculate_waiting_time(self):
+        if self.order_step is None:
+            return 0
+        steps_waited = self.model.schedule.steps - self.order_step
+        return steps_waited * self.model.time_step  # Convert to minutes
 
     def calculate_tip(self):
         """Calculate tip based on waiting time"""
-        if not self.order_time:
+        if not self.order_minute:
             return 0
 
-        self.waiting_time = ((self.model.current_time - self.order_time).total_seconds() % 3600) // 60
+        self.waiting_time = self.model.current_minute - self.order_minute
         base_tip_rate = 0.20  # 20% maximum tip
 
         if self.waiting_time <= 10:
@@ -53,7 +59,7 @@ class CustomerAgent(mesa.Agent):
         """Calculate payment including tip based on service time"""
         self.tip = self.calculate_tip()
         # Satisfaction based on waiting time (0-100)
-        self.waiting_time = ((self.model.current_time - self.order_time).total_seconds() % 3600) // 60
+        self.waiting_time = self.model.current_minute - self.order_minute
         self.satisfaction = max(0, 100 - (self.waiting_time * 2))  # Decrease by 2 points per minute
         return self.bill + self.tip
 
