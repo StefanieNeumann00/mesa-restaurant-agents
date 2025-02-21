@@ -26,7 +26,7 @@ class RestaurantModel(mesa.Model):
 
         for x in range(len(self.tables)):
             for y in range(len(self.tables[x])):
-                # 2 = Special table (possibly kitchen)
+                # 2 = Kitchen
                 # 1 = Regular table
                 # 0 = Walkway
                 if y % 2 != 0 and x % 2 != 0 and x != self.grid_width-1 and y != self.grid_height-1:
