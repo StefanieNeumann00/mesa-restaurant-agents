@@ -7,8 +7,6 @@ from ..agents.customer_agent import CustomerAgent
 from ..agents.manager_agent import ManagerAgent
 from ..agents.waiter_agent import WaiterAgent
 
-from ..utils.table import Table
-
 class RestaurantModel(mesa.Model):
     def __init__(self, n_waiters, grid_width, grid_height, seed=None):
         super().__init__(seed=seed)
@@ -28,8 +26,11 @@ class RestaurantModel(mesa.Model):
 
         for x in range(len(self.tables)):
             for y in range(len(self.tables[x])):
-                if y % 2 != 0 and x % 2 != 0 and x != self.grid_width-1 and y!= self.grid_height-1:
-                    if x == self.grid_width-2 and y== self.grid_height-2:
+                # 2 = Special table (possibly kitchen)
+                # 1 = Regular table
+                # 0 = Walkway
+                if y % 2 != 0 and x % 2 != 0 and x != self.grid_width-1 and y != self.grid_height-1:
+                    if x == self.grid_width-2 and y == self.grid_height-2:
                         self.tables[x][y] = 2
                     else:
                         self.tables[x][y] = 1
@@ -53,6 +54,7 @@ class RestaurantModel(mesa.Model):
             self.grid.empties
             x = random.randint(0, self.grid.width-1)
             y = random.randint(0, self.grid.height-1)
+            # Agents are placed randomly on walkways (where tables[x][y] == 0)
             while not self.grid.is_cell_empty((x,y)) and self.tables[x][y] == 0:
                 x = random.randint(0, self.grid.width-1)
                 y = random.randint(0, self.grid.height-1)
