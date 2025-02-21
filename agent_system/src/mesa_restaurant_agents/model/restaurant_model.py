@@ -1,6 +1,5 @@
 import mesa
 import numpy as np
-import random
 from datetime import datetime, timedelta
 import random
 
@@ -20,7 +19,6 @@ class RestaurantModel(mesa.Model):
         self.time_step = 5            # Each step represents 5 minutes
 
         # Create agents
-        self.tables = [Table(i) for i in range(100)]  # Create 100 tables
         WaiterAgent.create_agents(model=self, n=n_waiters)
         ManagerAgent.create_agents(model=self, n=1)
 
@@ -91,7 +89,7 @@ class RestaurantModel(mesa.Model):
         return np.random.poisson(base_rate)  # Random variation in arrivals
 
     def find_available_table(self):
-        """Find a random table with available seats"""
+        """Find a random table that is available for seating"""
         available_tables = [t for t in self.tables if t.is_available()]
         return random.choice(available_tables) if available_tables else None
 
