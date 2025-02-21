@@ -9,10 +9,6 @@ from ..agents.waiter_agent import WaiterAgent
 from ..utils.environment_definition import EnvironmentDefinition
 
 class RestaurantModel(mesa.Model):
-    # Cell type constants
-    WALKWAY = 0
-    TABLE = 1
-    KITCHEN = 2
 
     def __init__(self, n_waiters, grid_width, grid_height, seed=None):
         super().__init__(seed=seed)
@@ -80,7 +76,7 @@ class RestaurantModel(mesa.Model):
     def _setup_restaurant_layout(self):
         """Initialize the restaurant layout with tables, kitchen, and walkways"""
         # Set kitchen location
-        self.environment[self.kitchen_pos[0]][self.kitchen_pos[1]] = self.KITCHEN
+        self.environment[self.kitchen_pos[0]][self.kitchen_pos[1]] = EnvironmentDefinition.KITCHEN.value
 
         # Set tables and walkways
         for x in range(self.grid_width):
@@ -88,10 +84,10 @@ class RestaurantModel(mesa.Model):
                 pos = (x, y)
                 # Tables are placed on odd coordinates, not on edges
                 if (y % 2 != 0 and x % 2 != 0 and
-                        x != self.grid_width - 1 and y != self.grid_height - 1):
+                        x != self.grid_width - 1 and y != self.grid_height - 1 and (x,y) != self.kitchen_pos):
                     self.environment[x][y] = EnvironmentDefinition.FREE_TABLE.value
                     self.layout['tables'].add(pos)
-                elif pos != self.kitchen_pos:
+                else:
                     self.layout['walkways'].add(pos)
 
     def is_walkway(self, pos):
