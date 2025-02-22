@@ -97,22 +97,6 @@ class WaiterAgent(mesa.Agent):
             else:
                 self.move()
 
-        '''
-        else:  # Look for customers to serve
-            customer = self.get_best_customer()
-            if customer:
-                table_pos = customer.pos
-                self.target_pos = table_pos
-
-                # If next to table, take order
-                if self.pos in self.model.grid.get_neighborhood(
-                        table_pos, moore=False, include_center=True
-                ):
-                    self.take_order(customer)
-                else:
-                    self.move()
-        '''
-
     def serve_dish(self, customer):
         customer.order_status = OrderStatus.SERVED
         customer.assigned_waiter.append(self)

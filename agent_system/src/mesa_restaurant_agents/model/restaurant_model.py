@@ -18,16 +18,8 @@ class RestaurantModel(mesa.Model):
         # Initialize grid and environment first
         self.grid = mesa.space.SingleGrid(self.grid_width, self.grid_height, True)
         # Initialize environment and agents list
-        self.environment = [[0 for _ in range(grid_height)] for _ in range(grid_width)]
         self.agent_list = []
 
-        # Initialize sets after environment is created
-        self.free_positions = set()
-        self.occupied_positions = set()
-        self.walkway_positions = {(x, y)
-                                  for x in range(self.grid_width)
-                                  for y in range(self.grid_height)
-                                  if self.is_walkway((x, y))}
         # Convert times to minutes since opening
         self.opening_hour = 11 * 60  # 11:00 in minutes
         self.closing_hour = 23 * 60  # 23:00 in minutes

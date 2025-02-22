@@ -43,7 +43,7 @@ class RestaurantGrid(mesa.space.SingleGrid):
             return True
         return False
 
-    def is_cell_empty(self, agent, pos):
+    def is_cell_empty_for_agent(self, agent, pos):
         if isinstance(agent, CustomerAgent):
             return pos in self._empties_customers
         else:
@@ -51,7 +51,7 @@ class RestaurantGrid(mesa.space.SingleGrid):
     
     def place_agent(self, agent: mesa.Agent, pos: Coordinate) -> None:
         """Place the agent at the specified location, and set its pos variable."""
-        if self.is_cell_empty(agent, pos):
+        if self.is_cell_empty_for_agent(agent, pos):
             x, y = pos
             self._grid[x][y] = agent
             if self._empties_built:
