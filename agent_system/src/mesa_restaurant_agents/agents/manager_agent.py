@@ -33,9 +33,8 @@ class ManagerAgent(mesa.Agent):
 
     def calculate_profit(self):
         # Calculate revenue from customer bills and tips
-        total_sales = 0
-        for waiter in self.model.agents.select(agent_type=WaiterAgent):
-            total_sales += waiter.total_bills + waiter.tips
+        # Calculate daily profit considering various costs
+        total_sales = sum(w.tips for w in self.model.agents.select(agent_type=WaiterAgent))
 
         # Calculate costs
         staff_costs = len(self.model.agents.select(agent_type=WaiterAgent)) * 10  # Fixed cost per waiter
