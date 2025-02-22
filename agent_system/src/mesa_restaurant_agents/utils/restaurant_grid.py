@@ -18,19 +18,59 @@ class RestaurantGrid(mesa.space.SingleGrid):
         }
 
         self._setup_restaurant_layout()
-        self._empties_workers = self.layout['walkways']
-        self._empties_customers = self.layout['tables']
+        self._empties_workers = self.layout['walkways'].copy()  # Use copy to avoid reference issues
+        self._empties_customers = self.layout['tables'].copy()
 
     def _setup_restaurant_layout(self):
-        for x in range(self.width):
-            for y in range(self.height):
+        """Setup restaurant layout with walkways, tables, and kitchen"""
+        # First, create sets for all types
+        walkways = set()
+        tables = set()
+
+        # Place kitchen at bottom-right odd coordinate
+        kitchen_x = self.width - 2 if self.width % 2 == 0 else self.width - 1
+        kitchen_y = self.height - 2 if self.height % 2 == 0 else self.height - 1
+        self.layout['kitchen'] = (kitchen_x, kitchen_y)
+
+        # Fill all positions
+        for y in range(self.height):
+            for x in range(self.width):
                 pos = (x, y)
-                # Tables are placed on odd coordinates, not on edges
-                if (y % 2 != 0 and x % 2 != 0 and
-                        x != self.width - 1 and y != self.height - 1 and (x,y) != self.layout['kitchen']):
-                    self.layout['tables'].add(pos)
+                # Skip kitchen position
+                if pos == self.layout['kitchen']:
+                    continue
+                # Place tables on odd coordinates
+                if x % 2 == 1 and y % 2 == 1:
+                    tables.add(pos)
+                # All other positions are walkways
                 else:
-                    self.layout['walkways'].add(pos)
+                    walkways.add(pos)
+
+        # Update layout
+        self.layout['walkways'] = walkways
+        self.layout['tables'] = tables
+
+        # Validate total cell count
+        total_cells = len(walkways) + len(tables) + 1  # +1 for kitchen
+        if total_cells != self.width * self.height:
+            raise ValueError(f"Invalid cell count: {total_cells} vs {self.width * self.height}")
+
+    def debug_print(self):
+        """Print grid layout for debugging"""
+        print("\nGrid layout:")
+        for y in range(self.height):
+            row = []
+            for x in range(self.width):
+                pos = (x, y)
+                if pos == self.layout.get('kitchen'):
+                    row.append('K')
+                elif pos in self.layout.get('tables', set()):
+                    row.append('T')
+                elif pos in self.layout.get('walkways', set()):
+                    row.append('W')
+                else:
+                    row.append('E')
+            print(' '.join(row))
 
     def position_randomly(self, agent):
         if isinstance(agent, CustomerAgent) and self._empties_customers:
