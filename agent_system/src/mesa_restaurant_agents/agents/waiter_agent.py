@@ -7,13 +7,14 @@ class WaiterAgent(mesa.Agent):
     def __init__(self, model):
         super().__init__(model)
         # Initialize waiter properties
-        self.model = model            # Current serving status
-        self.carrying_food = []  # List of orders currently being carried
-        self.max_carry = 2       # Maximum number of food items that can be carried
+        self.model = model               # Current serving status
+        self.carrying_food = []          # List of orders currently being carried
+        self.max_carry = 2               # Maximum number of food items that can be carried
         self.tips = 0                    # Total tips received
         self.avg_rating = 0              # Average rating from customers
         self.ratings_count = 0           # Number of ratings received
         self.served_customers = 0        # Total customers served
+        self.target_pos = None           # Target position to move towards
 
     def can_pick_up_food(self):
         return len(self.carrying_food) < self.max_carry
@@ -91,36 +92,52 @@ class WaiterAgent(mesa.Agent):
         return self.model.grid.layout['kitchen']
 
     def step(self):
-        if self.carrying_food:  # Have food to deliver
-            # Find target customer's table position
+        if not self.carrying_food:
+            # Priority 1: Pick up prepared orders from kitchen
+            print(f"Waiter {self.unique_id} heading to kitchen at {self.pos}")
+            self.target_pos = self.get_kitchen_pos()
+            if self.pos == self.target_pos and self.model.kitchen.prepared_orders:
+                print(
+                    f"Waiter {self.unique_id} at kitchen. Orders available: {len(self.model.kitchen.prepared_orders)}")
+                self.pick_up_prepared_orders()
+                print(f"Waiter {self.unique_id} picked up: {len(self.carrying_food)} orders")
+            else:
+                self.move()
+        else:
+            # Priority 2: Deliver food to customers
             customer = self.get_best_customer()
             if customer:
-                table_pos = customer.pos
-                self.target_pos = table_pos
-
-                # If next to table, serve food
-                if self.pos in self.model.grid.get_neighborhood(
-                        table_pos, moore=False, include_center=True
-                ):
+                print(f"Waiter {self.unique_id} carrying food, heading to customer at {customer.pos}")
+                self.target_pos = customer.pos
+                if self.is_adjacent_to_target():
                     self.serve_dish(customer)
                 else:
                     self.move()
-
-        else:  # Need to get food from kitchen
-            self.target_pos = self.get_kitchen_pos()
-
-            # If at kitchen, pick up food
-            if self.pos == self.get_kitchen_pos():
-                for customer, order in self.model.kitchen.prepared_orders.items():
-                    if self.can_pick_up_food():
-                        self.pick_up_food(order)
             else:
-                self.move()
+                print(f"Waiter {self.unique_id} has food but no customer to serve")
+
+    def pick_up_prepared_orders(self):
+        for customer, order in list(self.model.kitchen.prepared_orders.items())[:self.max_carry]:
+            if self.can_pick_up_food():
+                self.carrying_food.append(order)
+                del self.model.kitchen.prepared_orders[customer]
+
+    def is_adjacent_to_target(self):
+        return self.pos in self.model.grid.get_neighborhood(
+            self.target_pos, moore=False, include_center=True
+        )
 
     def serve_dish(self, customer):
-        customer.order_status = OrderStatus.SERVED
-        customer.assigned_waiter.append(self)
-        self.served_customers += 1
+        """Serve food to customer"""
+        if customer in self.carrying_food:
+            customer.order_status = OrderStatus.SERVED
+            customer.assigned_waiter.append(self)
+            self.served_customers += 1
+            print(f"Waiter {self.unique_id} served customer at minute "
+                  f"{self.model.current_minute}. Customer waited {customer.waiting_time} minutes.")
+            self.carrying_food.remove(customer)  # Remove customer from carrying list
+            return True
+        return False
 
     def update_performance_metrics(self, customer):
         tip = customer.tip

@@ -14,28 +14,34 @@ class RestaurantModel(mesa.Model):
 
         self.grid_height = grid_height if grid_height % 2 != 0 else grid_height+1 # make sure grid_height is uneven
         self.grid_width = grid_width if grid_width % 2 != 0 else grid_width+1 # make sure grid_width is uneven
-
-        # Initialize grid and environment first
         self.grid = mesa.space.SingleGrid(self.grid_width, self.grid_height, True)
-        # Initialize environment and agents list
+
+        # Initialize tracking variables
+        self.profit = 0
         self.agent_list = []
+        self.customers_paid = 0
+        self.customers_left_without_paying = 0
+        self.customer_count = 0
+        self.daily_customers = []
 
-        # Convert times to minutes since opening
-        self.opening_hour = 11 * 60  # 11:00 in minutes
-        self.closing_hour = 23 * 60  # 23:00 in minutes
-        self.time_step = 5  # minutes per step
-        self.current_minute = self.opening_hour  # Start at opening time
+        # Time settings
+        self.opening_hour = 11 * 60
+        self.closing_hour = 23 * 60
+        self.time_step = 5
+        self.current_minute = self.opening_hour
 
-        WaiterAgent.create_agents(model=self, n=n_waiters)
-        ManagerAgent.create_agents(model=self, n=1)
-
-        self.kitchen = Kitchen(pos = (self.grid_width - 2, self.grid_height-2))
+        # Set up environment
+        self.kitchen = Kitchen(pos=(self.grid_width - 2, self.grid_height - 2))
         self.grid = RestaurantGrid(self.grid_width, self.grid_height, self.kitchen.pos)
+
+        # Debugging
+        print(f"Step {self.current_minute}, Profit: {self.profit}")
+        print(f"Active customers: {len([a for a in self.agent_list if isinstance(a, CustomerAgent)])}")
 
         # Create agents after environment setup
         WaiterAgent.create_agents(model=self, n=n_waiters)
-        ManagerAgent.create_agents(model=self, n=1)
         self.position(self.agents)
+        ManagerAgent.create_agents(model=self, n=1)
 
         # Set up model parameters
         self.n_waiters = n_waiters
@@ -50,8 +56,7 @@ class RestaurantModel(mesa.Model):
                     [c.waiting_time for c in m.agents.select(agent_type=CustomerAgent)]),
                 "Average_Customer_Satisfaction": lambda m: np.mean(
                     [c.satisfaction for c in m.agents.select(agent_type=CustomerAgent)]),
-                "Profit": lambda m: np.mean(
-                    [ma.daily_stats['profit'] for ma in m.agents.select(agent_type=ManagerAgent)]),
+                "Profit": lambda m: m.profit,
                 "Customer_Info": lambda m: self.get_customer_info(m.agents),
                 "Waiter_Info": lambda m: self.get_waiter_info(m.agents),
                 "GridState": self._get_grid_state,
@@ -119,8 +124,8 @@ class RestaurantModel(mesa.Model):
         for _ in range(n_new):
             customer = CustomerAgent(model=self)
             customer.order_time = self.current_minute
-            self.agents.add(customer)
-            self.position([customer])
+            self.agent_list.append(customer)  # Use agent_list
+            self.grid.position_randomly(customer)  # Use direct grid positioning
             self.kitchen.add_new_customer_order(customer, customer.food_preference, customer.order_time)
 
     def remove_customer(self, customer):
@@ -152,20 +157,34 @@ class RestaurantModel(mesa.Model):
 
     def step(self):
         """Advance simulation by one time step"""
+        self.current_minute += self.time_step
+
+        if self.current_minute % 60 == 0:  # Print stats every hour
+            print(f"Hour {self.current_minute//60}:")
+            print(f"Customers paid: {self.customers_paid}")
+            print(f"Customers left without paying: {self.customers_left_without_paying}")
+            print(f"Current profit: ${self.profit:.2f}\n")
+
         # Process restaurant operations during open hours
-        if not self.opening_hour <= self.current_minute <= self.closing_hour:
+        if self.current_minute > self.closing_hour:
             self.running = False
             return
 
-        # Always collect data first
-        self.datacollector.collect(self)
+        # Process kitchen orders
+        self.kitchen.add_ready_orders_to_prepared(self.current_minute)
+
+        # Update all agents
+        self.agents.shuffle_do("step")
+
+        # Update metrics
+        self.customer_count = len([a for a in self.agent_list if isinstance(a, CustomerAgent)])
 
         self.add_new_customers()
         self.kitchen.add_ready_orders_to_prepared(self.current_minute)
-        self.agents.shuffle_do("step")
-        self.current_minute += self.time_step
 
         # Check if restaurant is closing
         if self.current_minute >= self.closing_hour:
             self.running = False
+
+        self.datacollector.collect(self)
 
