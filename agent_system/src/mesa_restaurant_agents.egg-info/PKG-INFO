@@ -103,5 +103,45 @@ The `visualization.py` module shows that time-based mechanics have been replaced
   - Number of customers served
 * Financial tracking and profit calculation
 
+## Performance Profiling
+
+The restaurant simulation provides profiling capabilities to analyze performance bottlenecks and execution times. Use the `profile_simulation()` function to generate detailed performance metrics.
+
+### Basic Usage
+
+```python
+from mesa_restaurant_agents.model.restaurant_model import RestaurantModel
+from mesa_restaurant_agents.profiling import profile_simulation
+
+# Configure simulation parameters
+params = {
+    "n_waiters": 2,
+    "grid_width": 20,
+    "grid_height": 20
+}
+
+# Profile the simulation
+profile_simulation(
+    model_class=RestaurantModel,
+    params=params,
+    steps=15,
+    iterations=1
+)
+```
+
+### Inspecting Profile Results
+
+After running `profile_simulation()`, a `profile_results.prof` file will be generated. You can analyze this file using Python's built-in tools:
+
+#### Using snakeviz (Recommended)
+```bash
+# Install snakeviz
+pip install snakeviz
+
+# View results in browser
+snakeviz profile_results.prof
+```
+
+
 ## License
 MIT License EOL
