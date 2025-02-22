@@ -11,8 +11,6 @@ class RestaurantGrid(mesa.space.SingleGrid):
 
     def __init__(self, width, height, kitchen_pos):
         super().__init__(width, height, True)
-        self.grid_width = width
-        self.grid_height = height
         self.layout = {
             'kitchen': kitchen_pos,
             'walkways': set(),
@@ -24,12 +22,12 @@ class RestaurantGrid(mesa.space.SingleGrid):
         self._empties_customers = self.layout['tables']
 
     def _setup_restaurant_layout(self):
-        for x in range(self.grid_width):
-            for y in range(self.grid_height):
+        for x in range(self.width):
+            for y in range(self.height):
                 pos = (x, y)
                 # Tables are placed on odd coordinates, not on edges
                 if (y % 2 != 0 and x % 2 != 0 and
-                        x != self.grid_width - 1 and y != self.grid_height - 1 and (x,y) != self.layout['kitchen']):
+                        x != self.width - 1 and y != self.height - 1 and (x,y) != self.layout['kitchen']):
                     self.layout['tables'].add(pos)
                 else:
                     self.layout['walkways'].add(pos)
@@ -97,7 +95,7 @@ class RestaurantGrid(mesa.space.SingleGrid):
     def visualize(self):
         environment = np.zeros((self.width, self.height))
         for cell_content, (x, y) in self.coord_iter():
-            if len(cell_content) > 0:
+            if cell_content:
                 if isinstance(cell_content[0], CustomerAgent):
                     environment[x][y] = EnvironmentDefinition.CUSTOMER.value
                 elif isinstance(cell_content[0], WaiterAgent):

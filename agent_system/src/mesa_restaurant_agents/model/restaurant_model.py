@@ -15,10 +15,11 @@ class RestaurantModel(mesa.Model):
 
         self.grid_height = grid_height if grid_height % 2 != 0 else grid_height+1 # make sure grid_height is uneven
         self.grid_width = grid_width if grid_width % 2 != 0 else grid_width+1 # make sure grid_width is uneven
-        self.opening_time = datetime.strptime("11:00", "%H:%M")
-        self.closing_time = datetime.strptime("23:00", "%H:%M")
-        self.current_time = self.opening_time
-        self.time_step = 5  # Each step represents 5 minutes
+        # Convert times to minutes since opening
+        self.opening_hour = 11 * 60  # 11:00 in minutes
+        self.closing_hour = 23 * 60  # 23:00 in minutes
+        self.time_step = 5  # minutes per step
+        self.current_minute = self.opening_hour  # Start at opening time
 
         WaiterAgent.create_agents(model=self, n=n_waiters)
         ManagerAgent.create_agents(model=self, n=1)
@@ -53,11 +54,10 @@ class RestaurantModel(mesa.Model):
         customers = agents.select(agent_type=CustomerAgent)
         c_infos = []
         for customer in customers:
-            c_info = {}
-            c_info['customer_nr'] = customer.unique_id
-            c_info['waiting_time'] = customer.waiting_time
-            c_info['order_status'] = customer.order_status.value
-            c_info['satisfaction'] = customer.satisfaction
+            c_info = {"customer_nr": customer.unique_id,
+                      "waiting_time": customer.waiting_time,
+                      "order_status": customer.order_status.value,
+                      "satisfaction": customer.satisfaction}
             c_infos.append(c_info)
         return c_infos
 
@@ -65,11 +65,10 @@ class RestaurantModel(mesa.Model):
         waiters = agents.select(agent_type=WaiterAgent)
         w_infos = []
         for waiter in waiters:
-            w_info = {}
-            w_info['waiter_nr'] = waiter.unique_id
-            w_info["tips"] = waiter.tips
-            w_info["avg_rating"] = waiter.avg_rating
-            w_info["served_customers"] = waiter.served_customers
+            w_info = {"waiter_nr": waiter.unique_id,
+                      "tips": waiter.tips,
+                      "avg_rating": waiter.avg_rating,
+                      "served_customers": waiter.served_customers}
             w_infos.append(w_info)
         return w_infos
 
@@ -78,7 +77,7 @@ class RestaurantModel(mesa.Model):
 
     def is_peak_hour(self):
         """Check if current time is during peak hours"""
-        hour = self.current_time.hour
+        hour = self.current_minute // 60
         return (12 <= hour <= 14) or (17 <= hour <= 20)
 
     def calculate_new_customers(self):
@@ -92,7 +91,7 @@ class RestaurantModel(mesa.Model):
         n_new = self.calculate_new_customers()
         for _ in range(n_new):
             customer = CustomerAgent(model=self)
-            customer.order_time = self.current_time
+            customer.order_time = self.current_minute
             self.agents.add(customer)
             self.position([customer])
             self.kitchen.add_new_customer_order(customer, customer.food_preference, customer.order_time)
@@ -106,19 +105,19 @@ class RestaurantModel(mesa.Model):
     def step(self):
         """Advance simulation by one time step"""
         # Process restaurant operations during open hours
-        if self.opening_time <= self.current_time and self.current_time <= self.closing_time:
+        if self.opening_hour <= self.current_minute <= self.closing_hour:
             self.add_new_customers()
 
-        self.kitchen.add_ready_orders_to_prepared(self.current_time)
+        self.kitchen.add_ready_orders_to_prepared(self.current_minute)
 
         # Collect data and execute agent steps in random order
         self.datacollector.collect(self)
         self.agents.shuffle_do("step")
 
         # Update time
-        self.current_time += timedelta(minutes=self.time_step)
+        self.current_minute += self.time_step
 
         # Check closing time
-        if self.current_time >= self.closing_time:
+        if self.current_minute >= self.closing_hour:
             self.running = False
 

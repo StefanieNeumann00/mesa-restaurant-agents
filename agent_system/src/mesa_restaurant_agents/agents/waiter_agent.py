@@ -36,68 +36,32 @@ class WaiterAgent(mesa.Agent):
         return None
 
     def get_next_position(self):
-        current_pos = self.pos
-        if not self.target_pos:
-            return self.get_kitchen_pos()
-
-        if current_pos == self.target_pos:
-            return current_pos
-
-        # Get neighboring walkway cells
-        neighbors = self.model.grid.get_neighborhood(
-            current_pos,
-            moore=False,  # Use von Neumann neighborhood (no diagonals)
-            include_center=False
+        """Get next position that is empty and within movement constraints"""
+        possible_moves = self.model.grid.get_neighborhood(
+            self.pos,
+            moore=False,  # Only up, down, left, right movement
+            include_center=False  # Do not include current position
         )
 
-        # Precompute walkways for faster lookup
-        walkways = set(self.model.grid.layout['walkways'])
-
-        # Filter valid moves (only walkways)
-        valid_moves = [pos for pos in neighbors if pos in walkways]
-
-        if not valid_moves:
-            return current_pos
-
-        # Move towards target using Manhattan distance with a priority queue
-        distances = [
-            (abs(pos[0] - self.target_pos[0]) + abs(pos[1] - self.target_pos[1]), pos)
-            for pos in valid_moves
-        ]
-        heapq.heapify(distances)
-        return heapq.heappop(distances)[1]
-    
-
-    '''
-    def get_next_position(self):
-        current_pos = self.pos
         if not self.target_pos:
             return self.get_kitchen_pos()
-
-        # Get neighboring walkway cells
-        neighbors = self.model.grid.get_neighborhood(
-            current_pos,
-            moore=False,  # Use von Neumann neighborhood (no diagonals)
-            include_center=False
-        )
 
         # Filter valid moves (only walkways)
         valid_moves = [
-            pos for pos in neighbors
-            if pos in self.model.layout['walkways']
+            pos for pos in possible_moves
+            if self.model.grid.is_cell_empty(pos) and pos in self.model.grid.layout['walkways']
         ]
 
-        if not valid_moves:
-            return current_pos
+        if valid_moves:
+            # Move towards target using Manhattan distance
+            distances = [
+                (abs(pos[0] - self.target_pos[0]) +
+                 abs(pos[1] - self.target_pos[1]), pos)
+                for pos in valid_moves
+            ]
+            return min(distances, key=lambda x: x[0])[1]
 
-        # Move towards target using Manhattan distance
-        distances = [
-            (abs(pos[0] - self.target_pos[0]) +
-             abs(pos[1] - self.target_pos[1]), pos)
-            for pos in valid_moves
-        ]
-        return min(distances, key=lambda x: x[0])[1]
-    '''
+        return self.pos  # Stay in place if no valid moves
 
     def move(self):
         next_pos = self.get_next_position()
