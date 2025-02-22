@@ -65,11 +65,9 @@ def display_first_run_step_results_waiter(results):
 def visualize_grid(grid, ax):
     env, annot = grid.visualize()
     cmap = mcolors.ListedColormap(['#5C5A5A', '#CDCDCD', '#FFECA1', '#106366', '#FE9900', '#AA0F11'])
-    bounds = list(range(7))
-    norm = mcolors.BoundaryNorm(bounds, cmap.N)
 
     # Create the heatmap
-    sns.heatmap(env, cmap=cmap, norm=norm, annot=annot, cbar=False, square=True, fmt="", cbar_kws={'ticks': list(range(6))})
+    sns.heatmap(env, ax=ax, cmap=cmap, annot=annot, cbar=False, square=True, fmt="",)
     #sns.heatmap(env, ax=ax, cmap="viridis", annot=annot, cbar=False, square=True, fmt="")
 
 
