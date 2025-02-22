@@ -52,6 +52,13 @@ class WaiterAgent(mesa.Agent):
             if self.model.grid.is_cell_empty(pos) and pos in self.model.grid.layout['walkways']
         ]
 
+        # Include edge positions if no valid moves found
+        if not valid_moves:
+            valid_moves = [
+                pos for pos in possible_moves
+                if self.model.grid.is_cell_empty(pos)
+            ]
+
         if valid_moves:
             # Move towards target using Manhattan distance
             distances = [

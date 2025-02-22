@@ -24,14 +24,22 @@ class ManagerAgent(mesa.Agent):
         self.daily_stats['total_customers'] = len(model.agents.select(agent_type=CustomerAgent))
         self.daily_stats['active_waiters'] = len([w for w in model.agents.select(agent_type=WaiterAgent)])
         self.daily_stats['avg_waiting_time'] = np.mean([c.waiting_time for c in model.agents.select(agent_type=CustomerAgent)])
+        # Calculate profit each step
+        self.calculate_profit()
 
     def order_food(self, food_type, amount):
         # Replenish food inventory
         self.food_inventory[food_type] += amount
 
     def calculate_profit(self):
-        # Calculate daily profit considering various costs
-        total_sales = sum(w.tips for w in self.model.agents.select(agent_type=WaiterAgent))
+        # Calculate revenue from customer bills and tips
+        total_sales = 0
+        for waiter in self.model.agents.select(agent_type=WaiterAgent):
+            total_sales += waiter.total_bills + waiter.tips
+
+        # Calculate costs
         staff_costs = len(self.model.agents.select(agent_type=WaiterAgent)) * 10  # Fixed cost per waiter
         food_costs = sum(100 - amount for amount in self.food_inventory.values())
+
+        # Update profit
         self.daily_stats['profit'] = total_sales - (staff_costs + food_costs)
