@@ -39,18 +39,24 @@ class WaiterAgent(mesa.Agent):
         """Get next position that is empty and within movement constraints"""
         possible_moves = self.model.grid.get_neighborhood(
             self.pos,
-            moore=True,  # Only up, down, left, right movement
+            moore=False,  # Only up, down, left, right movement
             include_center=False  # Do not include current position
         )
 
         if not self.target_pos:
             return self.get_kitchen_pos()
 
+        print(f"Current pos: {self.pos}")
+        print(f"Possible moves: {possible_moves}")
+        print(f"Target pos: {self.target_pos}")
+
         # Filter valid moves (only walkways)
         valid_moves = [
             pos for pos in possible_moves
             if self.model.grid.is_cell_empty(pos) and pos in self.model.grid.layout['walkways']
         ]
+
+        print(f"Valid moves: {valid_moves}")
 
         # Include edge positions if no valid moves found
         if not valid_moves:
@@ -66,7 +72,9 @@ class WaiterAgent(mesa.Agent):
                  abs(pos[1] - self.target_pos[1]), pos)
                 for pos in valid_moves
             ]
-            return min(distances, key=lambda x: x[0])[1]
+            next_pos = min(distances, key=lambda x: x[0])[1]
+            print(f"Chosen move: {next_pos}")
+            return next_pos
 
         return self.pos  # Stay in place if no valid moves
 
