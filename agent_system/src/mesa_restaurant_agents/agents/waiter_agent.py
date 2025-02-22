@@ -39,7 +39,7 @@ class WaiterAgent(mesa.Agent):
         """Get next position that is empty and within movement constraints"""
         possible_moves = self.model.grid.get_neighborhood(
             self.pos,
-            moore=False,  # Only up, down, left, right movement
+            moore=True,  # Only up, down, left, right movement
             include_center=False  # Do not include current position
         )
 

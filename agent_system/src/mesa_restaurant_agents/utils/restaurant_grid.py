@@ -96,18 +96,18 @@ class RestaurantGrid(mesa.space.SingleGrid):
         environment = np.zeros((self.width, self.height))
         for cell_content, (x, y) in self.coord_iter():
             if cell_content:
-                if isinstance(cell_content[0], CustomerAgent):
+                if isinstance(cell_content, CustomerAgent):
                     environment[x][y] = EnvironmentDefinition.CUSTOMER.value
-                elif isinstance(cell_content[0], WaiterAgent):
+                elif isinstance(cell_content, WaiterAgent):
                     environment[x][y] = EnvironmentDefinition.WAITER.value
-                elif isinstance(cell_content[0], ManagerAgent):
+                elif isinstance(cell_content, ManagerAgent):
                     environment[x][y] = EnvironmentDefinition.MANAGER.value
+            elif self.is_kitchen((x,y)):
+                environment[x][y] = EnvironmentDefinition.KITCHEN.value
             elif self.is_walkway((x,y)):
                 environment[x][y] = EnvironmentDefinition.FREE.value
             elif self.is_table((x,y)):
                 environment[x][y] = EnvironmentDefinition.FREE_TABLE.value
-            elif self.is_kitchen((x,y)):
-                environment[x][y] = EnvironmentDefinition.KITCHEN.value
 
         annot = np.vectorize(EnvironmentDefinition.get_designations().get)(environment)
 
