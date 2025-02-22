@@ -3,11 +3,12 @@ from enum import Enum
 # Enum to track the status of customer orders
 class EnvironmentDefinition(Enum):
     FREE = 0
-    WAITER = 1
-    FREE_TABLE = 2
+    FREE_TABLE = 1
+    KITCHEN = 2
     CUSTOMER = 3
-    MANAGER = 4
-    KITCHEN = 5
+    WAITER = 4
+    MANAGER = 5
+    
 
     @classmethod
     def get_designations(cls):
