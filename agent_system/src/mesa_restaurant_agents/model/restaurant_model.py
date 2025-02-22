@@ -97,9 +97,9 @@ class RestaurantModel(mesa.Model):
 
     def calculate_new_customers(self):
         """Calculate number of new customers based on time of day"""
-        base_rate = 3  # Base arrival rate (non-peak)
+        base_rate = 5  # Base arrival rate (non-peak)
         if self.is_peak_hour():
-            base_rate = 8  # Increased arrival rate during peak hours
+            base_rate = 11  # Increased arrival rate during peak hours
         return np.random.poisson(base_rate)  # Random variation in arrivals
 
     def add_new_customers(self):
