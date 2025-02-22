@@ -54,11 +54,23 @@ class RestaurantModel(mesa.Model):
                     [ma.daily_stats['profit'] for ma in m.agents.select(agent_type=ManagerAgent)]),
                 "Customer_Info": lambda m: self.get_customer_info(m.agents),
                 "Waiter_Info": lambda m: self.get_waiter_info(m.agents),
-                "Grid": lambda m: m.grid
+                "GridState": self._get_grid_state,
             }
          )
         # Collect initial state
         self.datacollector.collect(self)
+
+    def _get_grid_state(self):
+        """Return lightweight grid state representation"""
+        state = []
+        for content, pos in self.grid.coord_iter():
+            if content:
+                state.append({
+                    'pos': pos,
+                    'type': type(content).__name__,
+                    'state': getattr(content, 'state', None)
+                })
+        return state
 
     def position(self, agents):
         for agent in agents:

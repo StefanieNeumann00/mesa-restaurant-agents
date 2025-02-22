@@ -4,6 +4,8 @@ from matplotlib import animation
 import plotly.express as px
 import seaborn as sns
 import matplotlib.colors as mcolors
+import numpy as np
+from .utils.environment_definition import EnvironmentDefinition
 
 def display_mean_step_results(results):
     df = pd.DataFrame(results)
@@ -75,28 +77,54 @@ class GridAnimator:
     def __init__(self, results):
         df = pd.DataFrame(results)
         data_first_run = df[df["RunId"] == 0]
-        self.grids = list(data_first_run["Grid"])
+        self.step_data = data_first_run.to_dict('records')
+        self.grid_width = 23  # Set based on your model parameters
+        self.grid_height = 23
         self.count = 0
         self.fig, self.ax = plt.subplots(figsize=(10, 10))
-        self.visualize_grid(self.grids[0])
+        self.init_ani()
 
-    def visualize_grid(self, grid):
-        env, annot = grid.visualize()
-        sns.heatmap(env, ax=self.ax, cmap="viridis", annot=annot, cbar=False, square=True, fmt="")
+    def _create_grid_frame(self, step_data):
+        """Convert lightweight grid state to visualization format"""
+        grid = np.zeros((self.grid_width, self.grid_height))
+        for cell in step_data['GridState']:
+            x, y = cell['pos']
+            # Ensure coordinates are within bounds
+            if x >= self.grid_width or y >= self.grid_height:
+                continue
+            agent_type = cell['type']
+            if agent_type == 'CustomerAgent':
+                grid[x][y] = EnvironmentDefinition.CUSTOMER.value
+            elif agent_type == 'WaiterAgent':
+                grid[x][y] = EnvironmentDefinition.WAITER.value
+            elif agent_type == 'ManagerAgent':
+                grid[x][y] = EnvironmentDefinition.MANAGER.value
+        return grid
+
+    def visualize_grid(self, step_data):
+        grid = self._create_grid_frame(step_data)
+        annot = np.vectorize(EnvironmentDefinition.get_designations().get)(grid)
+        cmap = mcolors.ListedColormap(['#5C5A5A', '#CDCDCD', '#FFECA1', '#106366', '#FE9900', '#AA0F11'])
+        sns.heatmap(grid, ax=self.ax, cmap=cmap, annot=annot, cbar=False, square=True, fmt="")
 
     def init_ani(self):
         self.ax.clear()
-        self.visualize_grid(self.grids[self.count])
-        self.count += 1
-
-    def animate(self, i):
-        self.ax.clear()
-        self.visualize_grid(self.grids[self.count])
+        self.visualize_grid(self.step_data[0])
         self.count += 1
         return self.ax
 
+    def animate(self, i):
+        self.ax.clear()
+        self.visualize_grid(self.step_data[i])
+        return self.ax
+
     def animate_first_run(self):
-        ani = animation.FuncAnimation(self.fig, self.animate, init_func=self.init_ani, frames=len(self.grids) - 1, repeat=False)
-        plt.show()
+        ani = animation.FuncAnimation(
+            self.fig,
+            self.animate,
+            init_func=self.init_ani,
+            frames=len(self.step_data) - 1,
+            repeat=False
+        )
         return ani
     
