@@ -1,6 +1,7 @@
 from ..utils.order_status import OrderStatus, food_options
 from ..agents.customer_agent import CustomerAgent
 import mesa
+import heapq
 
 class WaiterAgent(mesa.Agent):
     def __init__(self, model):
@@ -39,6 +40,40 @@ class WaiterAgent(mesa.Agent):
         if not self.target_pos:
             return self.get_kitchen_pos()
 
+        if current_pos == self.target_pos:
+            return current_pos
+
+        # Get neighboring walkway cells
+        neighbors = self.model.grid.get_neighborhood(
+            current_pos,
+            moore=False,  # Use von Neumann neighborhood (no diagonals)
+            include_center=False
+        )
+
+        # Precompute walkways for faster lookup
+        walkways = set(self.model.grid.layout['walkways'])
+
+        # Filter valid moves (only walkways)
+        valid_moves = [pos for pos in neighbors if pos in walkways]
+
+        if not valid_moves:
+            return current_pos
+
+        # Move towards target using Manhattan distance with a priority queue
+        distances = [
+            (abs(pos[0] - self.target_pos[0]) + abs(pos[1] - self.target_pos[1]), pos)
+            for pos in valid_moves
+        ]
+        heapq.heapify(distances)
+        return heapq.heappop(distances)[1]
+    
+
+    '''
+    def get_next_position(self):
+        current_pos = self.pos
+        if not self.target_pos:
+            return self.get_kitchen_pos()
+
         # Get neighboring walkway cells
         neighbors = self.model.grid.get_neighborhood(
             current_pos,
@@ -62,13 +97,14 @@ class WaiterAgent(mesa.Agent):
             for pos in valid_moves
         ]
         return min(distances, key=lambda x: x[0])[1]
+    '''
 
     def move(self):
         next_pos = self.get_next_position()
         self.model.grid.move_agent(self, next_pos)
 
     def get_kitchen_pos(self):
-        return self.model.layout['kitchen']
+        return self.model.grid.layout['kitchen']
 
     def step(self):
         if self.carrying_food:  # Have food to deliver

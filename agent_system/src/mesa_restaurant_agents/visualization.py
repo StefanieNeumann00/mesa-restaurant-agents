@@ -1,6 +1,8 @@
 import pandas as pd
 import matplotlib.pyplot as plt
+from matplotlib import animation
 import plotly.express as px
+import seaborn as sns
 
 def display_mean_step_results(results):
     df = pd.DataFrame(results)
@@ -58,3 +60,36 @@ def display_first_run_step_results_waiter(results):
                     height=400, nbins=len(waiter_infos_df['step'].unique()))
         print(fig.show())
     return waiter_infos_df
+
+def visualize_grid(grid, ax):
+    env, annot = grid.visualize()
+    sns.heatmap(env, ax=ax, cmap="viridis", annot=annot, cbar=False, square=True, fmt="")
+
+def animate_first_run(results):
+    df = pd.DataFrame(results)
+    data_first_run = df[df["RunId"]==0]
+    grids = list(data_first_run["Grid"])
+
+    fig, ax = plt.subplots(figsize=(10, 10))  # Reduce the figure size
+    visualize_grid(grids[0], ax)
+
+    count = 0
+    def init():
+        global count
+        ax.clear()
+        visualize_grid(grids[count], ax)
+        count += 1
+
+    # Define the animate function
+    def animate(i):
+        global count
+        ax.clear()
+        visualize_grid(grids[count], ax)
+        count += 1
+        return ax
+
+    # Create the animation
+    ani = animation.FuncAnimation(fig, animate, init_func=init, frames=len(grids)-1, repeat=False)
+    print(plt.show())
+    return ani
+    

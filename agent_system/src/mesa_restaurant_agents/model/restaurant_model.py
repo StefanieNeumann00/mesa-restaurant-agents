@@ -1,13 +1,12 @@
 import mesa
 import numpy as np
 from datetime import datetime, timedelta
-import random
 
 from ..agents.customer_agent import CustomerAgent
 from ..agents.manager_agent import ManagerAgent
 from ..agents.waiter_agent import WaiterAgent
-from ..utils.environment_definition import EnvironmentDefinition
 from ..utils.kitchen import Kitchen
+from ..utils.restaurant_grid import RestaurantGrid
 
 class RestaurantModel(mesa.Model):
 
@@ -24,16 +23,8 @@ class RestaurantModel(mesa.Model):
         WaiterAgent.create_agents(model=self, n=n_waiters)
         ManagerAgent.create_agents(model=self, n=1)
 
-        self.grid = mesa.space.SingleGrid(self.grid_width, self.grid_height, True)
-        self.environment = np.zeros((self.grid_width, self.grid_height))
         self.kitchen = Kitchen(pos = (self.grid_width - 2, self.grid_height-2))
-        self.layout = {
-            'kitchen': self.kitchen.pos,
-            'walkways': set(),
-            'tables': set()
-        }
-
-        self._setup_restaurant_layout()
+        self.grid = RestaurantGrid(self.grid_width, self.grid_height, self.kitchen.pos)
 
         self.position(self.agents)
 
@@ -49,64 +40,13 @@ class RestaurantModel(mesa.Model):
                     [ma.daily_stats['profit'] for ma in m.agents.select(agent_type=ManagerAgent)]),
                 "Customer_Info": lambda m: self.get_customer_info(m.agents),
                 "Waiter_Info": lambda m: self.get_waiter_info(m.agents),
-                "Environment": lambda m: m.environment,
                 "Grid": lambda m: m.grid
             }
         )
 
-    def get_free_positions(self, agent):
-        free_positions = []
-        if isinstance(agent, CustomerAgent):
-            for x in range(len(self.environment)):
-                for y in range(len(self.environment[x])):
-                    if self.environment[x][y] == EnvironmentDefinition.FREE_TABLE.value:
-                        free_positions.append((x,y))
-        else:
-            for x in range(len(self.environment)):
-                for y in range(len(self.environment[x])):
-                    if self.environment[x][y] == EnvironmentDefinition.FREE.value:
-                        free_positions.append((x,y))
-        return free_positions
-
-    def set_occupied(self, pos):
-        x = pos[0]
-        y = pos[1]
-        if self.environment[x][y] == EnvironmentDefinition.FREE.value:
-            self.environment[x][y] = EnvironmentDefinition.OCCUPIED.value
-        elif self.environment[x][y] == EnvironmentDefinition.FREE_TABLE.value:
-            self.environment[x][y] = EnvironmentDefinition.OCCUPIED_TABLE.value
-
-    def _setup_restaurant_layout(self):
-        """Initialize the restaurant layout with tables, kitchen, and walkways"""
-        # Set kitchen location
-        self.environment[self.kitchen.pos[0]][self.kitchen.pos[1]] = EnvironmentDefinition.KITCHEN.value
-
-        # Set tables and walkways
-        for x in range(self.grid_width):
-            for y in range(self.grid_height):
-                pos = (x, y)
-                # Tables are placed on odd coordinates, not on edges
-                if (y % 2 != 0 and x % 2 != 0 and
-                        x != self.grid_width - 1 and y != self.grid_height - 1 and (x,y) != self.kitchen.pos):
-                    self.environment[x][y] = EnvironmentDefinition.FREE_TABLE.value
-                    self.layout['tables'].add(pos)
-                else:
-                    self.layout['walkways'].add(pos)
-
-    def is_walkway(self, pos):
-        """Check if a position is a walkway"""
-        x, y = pos
-        return self.environment[x][y] == EnvironmentDefinition.FREE.value or self.environment[x][y] == EnvironmentDefinition.OCCUPIED.value
-
     def position(self, agents):
         for agent in agents:
-            free_positions = self.get_free_positions(agent)
-            if len(free_positions) > 0:
-                index = random.randint(0, len(free_positions)-1)
-                pos = free_positions[index]
-                self.grid.place_agent(agent, pos)
-                self.set_occupied(pos)
-            else:
+            if not self.grid.position_randomly(agent):
                 self.agents.remove(agent)
     
     def get_customer_info(self, agents):
@@ -181,3 +121,4 @@ class RestaurantModel(mesa.Model):
         # Check closing time
         if self.current_time >= self.closing_time:
             self.running = False
+
