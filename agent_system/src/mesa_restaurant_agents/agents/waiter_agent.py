@@ -31,10 +31,12 @@ class WaiterAgent(mesa.Agent):
         return False
 
     def get_best_customer(self):
-        customers_ordered = self.model.agents.select(filter_func=self.is_ordered)
-        if len(customers_ordered) > 0:
-            return customers_ordered.__getitem__(0)
-        return None
+        """Returns the first customer with a pending order"""
+        customers_ordered = [
+            agent for agent in self.model.agents
+            if isinstance(agent, CustomerAgent) and agent.order_status == OrderStatus.ORDERED
+        ]
+        return customers_ordered[0] if customers_ordered else None
 
     def get_next_position(self):
         """Get next position that is empty and within movement constraints"""
@@ -117,26 +119,38 @@ class WaiterAgent(mesa.Agent):
                 print(f"Waiter {self.unique_id} has food but no customer to serve")
 
     def pick_up_prepared_orders(self):
+        """Track kitchen order pickup"""
+        print(f"Waiter {self.unique_id} attempting pickup:")
+        print(f"- Kitchen has {len(self.model.kitchen.prepared_orders)} prepared orders")
+        print(f"- Currently carrying: {len(self.carrying_food)}/{self.max_carry} orders")
+
+        orders_picked = 0
         for customer, order in list(self.model.kitchen.prepared_orders.items())[:self.max_carry]:
             if self.can_pick_up_food():
-                self.carrying_food.append(order)
+                self.carrying_food.append((customer, order))
                 del self.model.kitchen.prepared_orders[customer]
+                orders_picked += 1
+                print(f"- Picked up order for customer {customer.unique_id}")
+
+        print(f"- Total orders picked up: {orders_picked}")
+        print(f"- Now carrying: {len(self.carrying_food)} orders")
 
     def is_adjacent_to_target(self):
         return self.pos in self.model.grid.get_neighborhood(
             self.target_pos, moore=False, include_center=True
         )
 
-    def serve_dish(self, customer):
+    def serve_dish(self, target_customer):
         """Serve food to customer"""
-        if customer in self.carrying_food:
-            customer.order_status = OrderStatus.SERVED
-            customer.assigned_waiter.append(self)
-            self.served_customers += 1
-            print(f"Waiter {self.unique_id} served customer at minute "
-                  f"{self.model.current_minute}. Customer waited {customer.waiting_time} minutes.")
-            self.carrying_food.remove(customer)  # Remove customer from carrying list
-            return True
+        for customer, order in self.carrying_food:
+            if customer == target_customer:
+                customer.order_status = OrderStatus.SERVED
+                customer.assigned_waiter.append(self)
+                self.served_customers += 1
+                print(f"Waiter {self.unique_id} served customer at minute "
+                      f"{self.model.current_minute}. Customer waited {customer.waiting_time} minutes.")
+                self.carrying_food.remove(customer, order)  # Remove customer from carrying list
+                return True
         return False
 
     def update_performance_metrics(self, customer):
