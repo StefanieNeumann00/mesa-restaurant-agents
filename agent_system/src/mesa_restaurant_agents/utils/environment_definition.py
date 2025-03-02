@@ -15,7 +15,7 @@ class EnvironmentDefinition(Enum):
         return {
             cls.FREE.value: "",
             cls.FREE_TABLE.value: "",
-            cls.KITCHEN.value: "",
+            cls.KITCHEN.value: "K",
             cls.CUSTOMER.value: "C",
             cls.WAITER.value: "W",
             cls.MANAGER.value: "M"

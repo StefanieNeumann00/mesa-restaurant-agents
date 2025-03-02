@@ -1,11 +1,12 @@
 import mesa
-Coordinate = tuple[int, int]
 from ..agents.customer_agent import CustomerAgent
 from ..agents.manager_agent import ManagerAgent
 from ..agents.waiter_agent import WaiterAgent
 from ..utils.environment_definition import EnvironmentDefinition
 import random
 import numpy as np
+
+Coordinate = tuple[int, int]
 
 class RestaurantGrid(mesa.space.SingleGrid):
 
@@ -27,9 +28,9 @@ class RestaurantGrid(mesa.space.SingleGrid):
         walkways = set()
         tables = set()
 
-        # Place kitchen at bottom-right odd coordinate
-        kitchen_x = self.width - 2 if self.width % 2 == 0 else self.width - 1
-        kitchen_y = self.height - 2 if self.height % 2 == 0 else self.height - 1
+        # Define kitchen position
+        kitchen_x = (self.width // 2) + 2 if self.width % 2 == 1 else (self.width // 2) + 2
+        kitchen_y = (self.height // 2) + 2 if self.height % 2 == 1 else (self.height // 2) + 2
         self.layout['kitchen'] = (kitchen_x, kitchen_y)
 
         # Fill all positions
@@ -87,10 +88,15 @@ class RestaurantGrid(mesa.space.SingleGrid):
         if isinstance(agent, CustomerAgent):
             return pos in self._empties_customers
         else:
-            return pos in self._empties_workers
+            return pos in self._empties_workers or pos == self.layout['kitchen']
     
     def place_agent(self, agent: mesa.Agent, pos: Coordinate) -> None:
         """Place the agent at the specified location, and set its pos variable."""
+        x, y = pos
+        # First check if cell is physically occupied
+        if self._grid[x][y] is not None:
+            raise Exception("Cell not empty - already occupied by another agent")
+        # Then check if position type is valid for this agent
         if self.is_cell_empty_for_agent(agent, pos):
             x, y = pos
             self._grid[x][y] = agent
@@ -103,7 +109,7 @@ class RestaurantGrid(mesa.space.SingleGrid):
             self._empty_mask[pos] = False
             agent.pos = pos
         else:
-            raise Exception("Cell not empty")
+            raise Exception("Cell not valid for this agent type")
 
     def remove_agent(self, agent: mesa.Agent) -> None:
         """Remove the agent from the grid and set its pos attribute to None."""
@@ -114,7 +120,7 @@ class RestaurantGrid(mesa.space.SingleGrid):
         if self._empties_built:
             self._empties.add(pos)
         if isinstance(agent, CustomerAgent):
-                self._empties_customers.add(pos)
+            self._empties_customers.add(pos)
         else:
             self._empties_workers.add(pos)
         self._empty_mask[agent.pos] = True

@@ -82,7 +82,7 @@ def display_first_run_step_results_waiter(results):
 
 def visualize_grid(grid, ax):
     env, annot = grid.visualize()
-    cmap = mcolors.ListedColormap(['#5C5A5A', '#CDCDCD', '#FFECA1', '#106366', '#FE9900', '#AA0F11'])
+    cmap = mcolors.ListedColormap(['#F5F5F5', '#DEB887', '#FFFFFF', '#4169E1', '#FF8C00', '#8B0000'])
 
     # Create the heatmap
     sns.heatmap(env, ax=ax, cmap=cmap, annot=annot, cbar=False, square=True, fmt="", )
@@ -102,7 +102,33 @@ class GridAnimator:
 
     def _create_grid_frame(self, step_data):
         """Convert lightweight grid state to visualization format"""
-        grid = np.zeros((self.grid_width, self.grid_height))
+        # Initialize grid with FREE value
+        grid = np.ones((self.grid_width, self.grid_height)) * EnvironmentDefinition.FREE.value
+
+        # Get restaurant layout information if available in step_data
+        if 'Layout' in step_data:
+            layout = step_data['Layout']
+
+            # Set tables
+            for pos in layout.get('tables', []):
+                x, y = pos
+                if 0 <= x < self.grid_width and 0 <= y < self.grid_height:
+                    grid[x][y] = EnvironmentDefinition.FREE_TABLE.value
+
+            # Set kitchen
+            if 'kitchen' in layout:
+                kitchen_cells = layout['kitchen']
+                if isinstance(kitchen_cells, list) or isinstance(kitchen_cells, set):
+                    for pos in kitchen_cells:
+                        x, y = pos
+                        if 0 <= x < self.grid_width and 0 <= y < self.grid_height:
+                            grid[x][y] = EnvironmentDefinition.KITCHEN.value
+                else:
+                    x, y = layout['kitchen']
+                    if 0 <= x < self.grid_width and 0 <= y < self.grid_height:
+                        grid[x][y] = EnvironmentDefinition.KITCHEN.value
+
+        # Place agents
         for cell in step_data['GridState']:
             x, y = cell['pos']
             # Ensure coordinates are within bounds
@@ -115,12 +141,13 @@ class GridAnimator:
                 grid[x][y] = EnvironmentDefinition.WAITER.value
             elif agent_type == 'ManagerAgent':
                 grid[x][y] = EnvironmentDefinition.MANAGER.value
+
         return grid
 
     def visualize_grid(self, step_data):
         grid = self._create_grid_frame(step_data)
         annot = np.vectorize(EnvironmentDefinition.get_designations().get)(grid)
-        cmap = mcolors.ListedColormap(['#5C5A5A', '#CDCDCD', '#FFECA1', '#106366', '#FE9900', '#AA0F11'])
+        cmap = mcolors.ListedColormap(['#F5F5F5', '#DEB887', '#FFFFFF', '#4169E1', '#FF8C00', '#8B0000'])
         sns.heatmap(grid, ax=self.ax, cmap=cmap, annot=annot, cbar=False, square=True, fmt="")
 
     def init_ani(self):

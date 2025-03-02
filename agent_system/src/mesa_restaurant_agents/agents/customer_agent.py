@@ -40,12 +40,6 @@ class CustomerAgent(mesa.Agent):
             if time_spent >= self.dining_duration:
                 self.leave_restaurant()
 
-    def calculate_waiting_time(self):
-        if self.order_step is None:
-            return 0
-        steps_waited = self.model.schedule.steps - self.order_step
-        return steps_waited * self.model.time_step  # Convert to minutes
-
     def calculate_tip(self):
         """Calculate tip based on waiting time"""
         if not self.order_minute:
@@ -81,6 +75,18 @@ class CustomerAgent(mesa.Agent):
 
     def leave_without_paying(self):
         """Leave restaurant due to excessive waiting time"""
+        # Find waiters in the model's agent list
+        waiters = self.model.agents.select(lambda x: hasattr(x, 'carrying_food'))
+
+        # Notify waiters carrying food for this customer
+        for waiter in waiters:
+            for i, (customer, food_type) in enumerate(waiter.carrying_food):
+                if customer == self:
+                    # Mark food as available for reassignment
+                    waiter.carrying_food[i] = (None, food_type)
+                    print(
+                        f"Waiter {waiter.unique_id} notified: Customer {self.unique_id} left, will reassign their {food_type}")
+
         self.satisfaction = 0
         self.tip = 0
         self.model.customers_left_without_paying += 1
@@ -92,8 +98,18 @@ class CustomerAgent(mesa.Agent):
         payment = self.rate_and_pay()
         self.model.customers_paid += 1
         print(f"Customer paid ${payment:.2f} at minute {self.model.current_minute}. Wait time: {self.waiting_time}")
+
+        # Clean up references in waiters' carrying lists
+        waiters = self.model.agents.select(lambda x: hasattr(x, 'carrying_food'))
+
+        for waiter in waiters:
+            for i, (customer, food_type) in enumerate(waiter.carrying_food):
+                if customer == self:
+                    waiter.carrying_food[i] = (None, food_type)
+
         # Remove reference to undefined self.waiter
         if self.assigned_waiter:
             for waiter in self.assigned_waiter:
                 waiter.update_performance_metrics(self)
+
         self.model.remove_customer(self)

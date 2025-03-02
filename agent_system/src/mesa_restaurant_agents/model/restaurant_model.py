@@ -1,6 +1,5 @@
 import mesa
 import numpy as np
-from datetime import datetime, timedelta
 
 from ..agents.customer_agent import CustomerAgent
 from ..agents.manager_agent import ManagerAgent
@@ -16,13 +15,19 @@ class RestaurantModel(mesa.Model):
         self.grid_width = grid_width if grid_width % 2 != 0 else grid_width+1 # make sure grid_width is uneven
         self.grid = mesa.space.SingleGrid(self.grid_width, self.grid_height, True)
 
+        # Set up environment
+        kitchen_x = (self.grid_width // 2) + 2 if self.grid_width % 2 == 1 else (self.grid_width // 2) + 2
+        kitchen_y = (self.grid_width // 2) + 2 if self.grid_height % 2 == 1 else (self.grid_height // 2) + 2
+        self.kitchen = Kitchen(pos=(kitchen_x, kitchen_y))
+        self.grid = RestaurantGrid(self.grid_width, self.grid_height, self.kitchen.pos)
+
         # Initialize tracking variables
         self.profit = 0
-        self.agent_list = []
         self.customers_paid = 0
         self.customers_left_without_paying = 0
         self.customer_count = 0
         self.daily_customers = []
+        self.kitchen_access = None  # Track which waiter has kitchen access
 
         # Time settings
         self.opening_hour = 11 * 60
@@ -30,18 +35,14 @@ class RestaurantModel(mesa.Model):
         self.time_step = 5
         self.current_minute = self.opening_hour
 
-        # Set up environment
-        self.kitchen = Kitchen(pos=(self.grid_width - 2, self.grid_height - 2))
-        self.grid = RestaurantGrid(self.grid_width, self.grid_height, self.kitchen.pos)
-
         # Debugging
         print(f"Step {self.current_minute}, Profit: {self.profit}")
-        print(f"Active customers: {len([a for a in self.agent_list if isinstance(a, CustomerAgent)])}")
+        print(f"Active customers: {len(self.agents.select(agent_type=CustomerAgent))}")
 
         # Create agents after environment setup
         WaiterAgent.create_agents(model=self, n=n_waiters)
-        self.position(self.agents)
         ManagerAgent.create_agents(model=self, n=1)
+        self.position(self.agents)
 
         # Set up model parameters
         self.n_waiters = n_waiters
@@ -104,6 +105,18 @@ class RestaurantModel(mesa.Model):
             w_infos.append(w_info)
         return w_infos
 
+    def reserve_kitchen_access(self, agent):
+        """Reserve exclusive access to the kitchen for an agent"""
+        if self.kitchen_access is None or self.kitchen_access == agent:
+            self.kitchen_access = agent
+            return True
+        return False
+
+    def release_kitchen_access(self, agent):
+        """Release kitchen access when agent leaves"""
+        if self.kitchen_access == agent:
+            self.kitchen_access = None
+
     def get_customers_count(self, agents):
         return len(agents.select(agent_type=CustomerAgent))
 
@@ -124,7 +137,7 @@ class RestaurantModel(mesa.Model):
         for _ in range(n_new):
             customer = CustomerAgent(model=self)
             customer.order_time = self.current_minute
-            self.agent_list.append(customer)  # Use agent_list
+            self.agents.add(customer)
             self.grid.position_randomly(customer)  # Use direct grid positioning
             self.kitchen.add_new_customer_order(customer, customer.food_preference, customer.order_time)
 
@@ -136,21 +149,21 @@ class RestaurantModel(mesa.Model):
 
     def get_average_wait_time(self):
         """Calculate average wait time safely"""
-        customers = [a for a in self.agents if isinstance(a, CustomerAgent)]
+        customers = self.agents.select(agent_type=CustomerAgent)
         if not customers:
             return 0.0
         return sum(c.waiting_time for c in customers) / len(customers)
 
     def get_average_satisfaction(self):
         """Calculate average satisfaction safely"""
-        customers = [a for a in self.agents if isinstance(a, CustomerAgent)]
+        customers = self.agents.select(agent_type=CustomerAgent)
         if not customers:
             return 100.0
         return sum(c.satisfaction for c in customers) / len(customers)
 
     def get_total_profit(self):
         """Calculate total profit safely"""
-        managers = [a for a in self.agents if isinstance(a, ManagerAgent)]
+        managers = self.agents.select(agent_type=ManagerAgent)
         if not managers:
             return 0.0
         return sum(m.daily_stats.get('profit', 0) for m in managers)
@@ -171,16 +184,18 @@ class RestaurantModel(mesa.Model):
             return
 
         # Process kitchen orders
+        print(f"Kitchen state: {len(self.kitchen.requested_orders)} requested, "
+              f"{len(self.kitchen.prepared_orders)} prepared")
+
         self.kitchen.add_ready_orders_to_prepared(self.current_minute)
 
         # Update all agents
         self.agents.shuffle_do("step")
 
         # Update metrics
-        self.customer_count = len([a for a in self.agent_list if isinstance(a, CustomerAgent)])
+        self.customer_count = len(self.agents.select(agent_type=CustomerAgent))
 
         self.add_new_customers()
-        self.kitchen.add_ready_orders_to_prepared(self.current_minute)
 
         # Check if restaurant is closing
         if self.current_minute >= self.closing_hour:
