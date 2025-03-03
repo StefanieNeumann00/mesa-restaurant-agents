@@ -9,26 +9,26 @@ class WaiterAgent(mesa.Agent):
         # Initialize waiter properties
         self.model = model  # Current serving status
         self.carrying_food = []  # List of orders currently being carried
-        self.max_carry = 2  # Maximum number of food items that can be carried
+        self.max_carry = 4  # Maximum number of food items that can be carried
         self.tips = 0  # Total tips received
         self.avg_rating = 0  # Average rating from customers
         self.ratings_count = 0  # Number of ratings received
         self.served_customers = 0  # Total customers served
         self.target_pos = None  # Target position to move towards
         self.current_pos = None  # Current position of the waiter
+        self.previous_pos = None  # Previous position to avoid oscillation
 
-    def can_pick_up_food(self, customer, order):
+    def can_pick_up_food(self, customer=None, order=None):
         """Check if the waiter can pick up more food and if the order is valid"""
-        if len(self.carrying_food) >= self.max_carry:
-            return False
-        return True
+        return len(self.carrying_food) < self.max_carry
 
     def pick_up_food(self, customer, order):
         """Add an order to the waiter's carrying load"""
         if self.can_pick_up_food():
             self.carrying_food.append((customer, order))
-            return True
-        return False
+            print(f"Waiter {self.unique_id} picked up food: {self.carrying_food}")
+        else:
+            print(f"Waiter {self.unique_id} found no food to pick up.")
 
     def is_ordered(self, agent):
         return (hasattr(agent, "order_status") and
@@ -36,148 +36,158 @@ class WaiterAgent(mesa.Agent):
 
     def get_best_customer(self):
         """Find the best customer to serve based on food being carried."""
-        if not self.carrying_food:
-            return None
+        print(f"Waiter {self.unique_id} looking for best customer:")
+        print(f"Currently carrying: {[(c.unique_id if c else 'None', o) for c, o in self.carrying_food]}")
 
-        # Get all customer agents
-        customers = self.model.agents.select(agent_type=CustomerAgent)
-        customers = [c for c in customers if c.pos is not None]
+        ready_customers = [c for c in self.model.agents.select(agent_type=CustomerAgent)
+                           if hasattr(c, "order_status") and
+                           c.order_status == OrderStatus.ORDERED and
+                           c.pos is not None and
+                           not c.assigned_waiter]
+
+        if not ready_customers:
+            print("No ready customers found")
+            return None
 
         # First priority: serve customers we have specific food for
         for customer, order in self.carrying_food:
-            if customer and customer in customers and not customer.assigned_waiter:
-                customer.assigned_waiter.append(self)
+            if customer and customer in ready_customers:
+                print(f"Found matching customer {customer.unique_id} for carried order")
+                customer.assigned_waiter = [self]
                 return customer
 
-            # Second priority: find customers waiting longest for food types we're carrying
+        # Second priority: find customers waiting longest for food types we're carrying
         reassignable_foods = [order for customer, order in self.carrying_food if customer is None]
         if reassignable_foods:
-            waiting_customers = [
-                agent for agent in customers
-                if (self.is_ordered(agent) and
-                    agent.food_preference in reassignable_foods and
-                    not agent.assigned_waiter)
+            # Find customers waiting for food types we're carrying
+            matching_customers = [
+                c for c in ready_customers
+                if c.food_preference in reassignable_foods
             ]
 
-            # Return customer with the longest waiting time
-            if waiting_customers:
-                customer = max(waiting_customers, key=lambda c: c.waiting_time)
-                customer.assigned_waiter.append(self)
-                return customer
+            if matching_customers:
+                # Get customer with longest wait time
+                best_customer = max(matching_customers, key=lambda c: c.waiting_time)
+                print(f"Reassigning food to customer {best_customer.unique_id} "
+                      f"(waiting time: {best_customer.waiting_time})")
+                best_customer.assigned_waiter = [self]  # Reset assignment
+                return best_customer
+
+        # Sort by waiting time (descending) and then by distance (ascending)
+        ready_customers.sort(key=lambda c: (
+            -c.waiting_time,  # Negative to sort descending by waiting time
+            self.manhattan_distance(self.pos, c.pos)  # Sort ascending by distance
+        ))
+
+        # Third priority: just take the customer that's been waiting longest
+        if ready_customers:
+            best_customer = ready_customers[0]
+            print(f"Selected customer {best_customer.unique_id} based on wait time "
+                  f"({best_customer.waiting_time}) and distance "
+                  f"({self.manhattan_distance(self.pos, best_customer.pos)})")
+            best_customer.assigned_waiter = [self]
+            return best_customer
 
         return None
 
-    def get_next_position(self):
-        """Get next position that is empty and within movement constraints"""
-        possible_moves = self.model.grid.get_neighborhood(
-            self.pos,
-            moore=True,  # allow diagonal movement
-            include_center=False  # Do not include current position
-        )
+    def move(self, steps=4):
+        """Move towards the target position using A* pathfinding"""
+        if not self.target_pos or self.pos == self.target_pos:
+            return
 
-        # print(f"All possible moves from {self.pos}: {possible_moves}")
-        # print(f"Moves that are walkways: {[m for m in possible_moves if m in self.model.grid.layout['walkways']]}")
-
-        if not self.target_pos:
-            return self.get_kitchen_pos()
-
-            # # Debug prints to check walkways
-            # print(f"Current pos: {self.pos}")
-            # print(f"Possible moves: {possible_moves}")
-            # print(f"Target pos: {self.target_pos}")
-            # print(f"Walkways available: {[pos for pos in possible_moves if pos in self.model.grid.layout['walkways']]}")
-
-        # Filter valid moves (only walkways)
-        valid_moves = [
-            pos for pos in possible_moves
-            if self.model.grid.is_cell_empty(pos) and (pos in self.model.grid.layout['walkways'] or
-                                                       pos == self.model.grid.layout['kitchen'])
-        ]
-
-        # print(f"Valid moves: {valid_moves}")
-
-        # Include edge positions if no valid moves found
-        if not valid_moves:
-            valid_moves = [
-                pos for pos in possible_moves
-                if self.model.grid.is_cell_empty(pos)
-            ]
-
-        if valid_moves:
-            # Move towards target using Manhattan distance
-            distances = [
-                (abs(pos[0] - self.target_pos[0]) +
-                 abs(pos[1] - self.target_pos[1]), pos)
-                for pos in valid_moves
-            ]
-            next_pos = min(distances, key=lambda x: x[0])[1]
-            # print(f"Chosen move: {next_pos}")
-            return next_pos
-
-        return self.pos  # Stay in place if no valid moves
-
-    def move(self, steps=8):
-        """Move towards target position, avoiding obstacles"""
         initial_pos = self.pos
-        for _ in range(steps):
-            next_pos = self.get_next_position()
-            if next_pos == self.pos:  # No valid moves left
+        moves_made = 0
+
+        while moves_made < steps:
+            valid_moves = self.get_valid_moves_toward_target(self.target_pos)
+            if not valid_moves:
                 break
-            self.model.grid.move_agent(self, next_pos)
-        print(f"Waiter {self.unique_id} moved from {initial_pos} to {self.pos}")
+            # Store current position before moving
+            self.previous_pos = self.pos
+            # Take the first move (closest to target)
+            new_pos = valid_moves[0]
+
+            # Stop if we reached target or would overshoot
+            if new_pos == self.target_pos or self.manhattan_distance(new_pos,
+                                                                     self.target_pos) >= self.manhattan_distance(
+                    self.pos, self.target_pos):
+                self.model.grid.move_agent(self, new_pos)
+                break
+
+            self.model.grid.move_agent(self, new_pos)
+            moves_made += 1
+
+        if moves_made > 0:
+            print(f"Waiter {self.unique_id} moved from {initial_pos} to {self.pos}")
+            return True
+
+        return False
 
     def get_kitchen_pos(self):
         return self.model.grid.layout['kitchen']
 
-    def step(self):
-        if not self.carrying_food:
-            # Priority 1: Pick up prepared orders from kitchen
-            kitchen_pos = self.get_kitchen_pos()
-            print(f"Waiter {self.unique_id} heading to kitchen at {kitchen_pos}, current pos: {self.pos}")
-            self.target_pos = kitchen_pos
+    def get_valid_moves_toward_target(self, target_pos):
+        """Get valid moves sorted by distance to target position"""
+        # Get possible moves
+        possible_moves = self.model.grid.get_neighborhood(
+            self.pos, moore=True, include_center=False
+        )
 
+        # Filter valid moves (only walkways or kitchen)
+        valid_moves = []
+        for pos in possible_moves:
+            cell_contents = self.model.grid.get_cell_list_contents(pos)
+            is_walkable = (pos in self.model.grid.layout['walkways'] or
+                           pos == self.model.grid.layout['kitchen'])
+            if is_walkable and len(cell_contents) == 0:
+                valid_moves.append(pos)
+
+        # Sort by distance to target if we have valid moves
+        if valid_moves and target_pos:
+            return sorted(valid_moves,
+                          key=lambda p: self.manhattan_distance(p, target_pos))
+
+        return valid_moves
+
+    def manhattan_distance(self, pos1, pos2):
+        """Calculate Manhattan distance between two positions"""
+        return abs(pos1[0] - pos2[0]) + abs(pos1[1] - pos2[1])
+
+    def step(self):
+        # First handle food delivery if carrying food
+        if self.carrying_food:
+            # If we already have a target customer, continue serving them
+            if not self.target_pos:  # Only find new target if we don't have one
+                customer = self.get_best_customer()
+                if customer:
+                    self.target_pos = customer.pos
+                    print(f"Waiter {self.unique_id} targeting customer {customer.unique_id} at {self.target_pos}")
+
+            if self.target_pos:
+                # Move toward current target
+                self.move()
+
+                # Check if we have a valid customer to deliver to
+                cell_contents = self.model.grid.get_cell_list_contents(self.target_pos)
+                customers = [obj for obj in cell_contents if isinstance(obj, CustomerAgent)]
+                if customers and self.pos in self.model.grid.get_neighborhood(
+                        self.target_pos, moore=True, include_center=False):
+                    self.serve_dish(customers[0])
+                    self.target_pos = None  # Reset target after serving
+
+        else:
+            # No food - handle kitchen operations
+            kitchen_pos = self.get_kitchen_pos()
             if self.pos == kitchen_pos:
-                # Already at kitchen, try to pick up orders
                 if self.model.kitchen.prepared_orders:
-                    print(
-                        f"Waiter {self.unique_id} at kitchen. Orders available: {len(self.model.kitchen.prepared_orders)}")
                     self.pick_up_prepared_orders()
-                    print(f"Waiter {self.unique_id} picked up: {len(self.carrying_food)} orders")
-                    # Release kitchen access when done
+                    # Immediately find customer after pickup
+                    customer = self.get_best_customer()
+                    if customer:
+                        self.target_pos = customer.pos
                     self.model.release_kitchen_access(self)
             else:
-                # Need to move to the kitchen
-                next_pos = self.get_next_position()
-                # Check if next move is to kitchen
-                if next_pos == kitchen_pos:
-                    # Try to reserve kitchen access
-                    if self.model.reserve_kitchen_access(self):
-                        # We have permission to enter kitchen
-                        self.model.grid.move_agent(self, next_pos)
-                    else:
-                        # Kitchen is occupied, stay in place
-                        print(f"Waiter {self.unique_id} waiting for kitchen access")
-                else:
-                    # Normal movement (not to kitchen)
-                    self.move()
-        else:
-            # Priority 2: Deliver food to customers
-            customer = self.get_best_customer()
-            if customer and customer.pos is not None:  # Check if customer and pos exist
-                print(f"Waiter {self.unique_id} carrying food, heading to customer at {customer.pos}")
-                self.target_pos = customer.pos
-
-                # Direct check if adjacent to customer
-                if self.pos in self.model.grid.get_neighborhood(
-                        customer.pos, moore=False, include_center=True
-                ):
-                    self.serve_dish(customer)
-                else:
-                    self.move()
-            else:
-                print(f"Waiter {self.unique_id} has food but no customer to serve")
-                # Option: Find another customer or return to kitchen
-                self.target_pos = self.get_kitchen_pos()
+                self.target_pos = kitchen_pos
                 self.move()
 
     def pick_up_prepared_orders(self):

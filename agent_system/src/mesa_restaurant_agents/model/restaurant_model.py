@@ -7,12 +7,13 @@ from ..agents.waiter_agent import WaiterAgent
 from ..utils.kitchen import Kitchen
 from ..utils.restaurant_grid import RestaurantGrid
 
+
 class RestaurantModel(mesa.Model):
     def __init__(self, n_waiters, grid_width, grid_height, seed=None):
         super().__init__(seed=seed)
 
-        self.grid_height = grid_height if grid_height % 2 != 0 else grid_height+1 # make sure grid_height is uneven
-        self.grid_width = grid_width if grid_width % 2 != 0 else grid_width+1 # make sure grid_width is uneven
+        self.grid_height = grid_height if grid_height % 2 != 0 else grid_height + 1  # make sure grid_height is uneven
+        self.grid_width = grid_width if grid_width % 2 != 0 else grid_width + 1  # make sure grid_width is uneven
         self.grid = mesa.space.SingleGrid(self.grid_width, self.grid_height, True)
 
         # Set up environment
@@ -62,27 +63,44 @@ class RestaurantModel(mesa.Model):
                 "Waiter_Info": lambda m: self.get_waiter_info(m.agents),
                 "GridState": self._get_grid_state,
             }
-         )
+        )
         # Collect initial state
         self.datacollector.collect(self)
 
     def _get_grid_state(self):
         """Return lightweight grid state representation"""
         state = []
-        for content, pos in self.grid.coord_iter():
-            if content:
+        # Add kitchen position
+        state.append({
+            'pos': self.kitchen.pos,
+            'type': 'Kitchen'
+        })
+        # Add table positions
+        for table_pos in self.grid.layout['tables']:
+            state.append({
+                'pos': table_pos,
+                'type': 'Table'
+            })
+
+        # Debug the grid structure
+        # print("Grid empties:", self.grid.empties)
+        # print("Agents count:", len(self.agents))
+
+        for agent in self.agents:
+            # print(f"Agent: {type(agent).__name__}, Position: {getattr(agent, 'pos', None)}")
+            if hasattr(agent, 'pos') and agent.pos is not None:
                 state.append({
-                    'pos': pos,
-                    'type': type(content).__name__,
-                    'state': getattr(content, 'state', None)
+                    'pos': agent.pos,
+                    'type': type(agent).__name__,
                 })
+        # print(f"Final state size: {len(state)}")
         return state
 
     def position(self, agents):
         for agent in agents:
             if not self.grid.position_randomly(agent):
                 self.agents.remove(agent)
-    
+
     def get_customer_info(self, agents):
         customers = agents.select(agent_type=CustomerAgent)
         c_infos = []
@@ -173,7 +191,7 @@ class RestaurantModel(mesa.Model):
         self.current_minute += self.time_step
 
         if self.current_minute % 60 == 0:  # Print stats every hour
-            print(f"Hour {self.current_minute//60}:")
+            print(f"Hour {self.current_minute // 60}:")
             print(f"Customers paid: {self.customers_paid}")
             print(f"Customers left without paying: {self.customers_left_without_paying}")
             print(f"Current profit: ${self.profit:.2f}\n")
@@ -202,4 +220,3 @@ class RestaurantModel(mesa.Model):
             self.running = False
 
         self.datacollector.collect(self)
-

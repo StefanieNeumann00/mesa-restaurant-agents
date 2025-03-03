@@ -105,41 +105,32 @@ class GridAnimator:
         # Initialize grid with FREE value
         grid = np.ones((self.grid_width, self.grid_height)) * EnvironmentDefinition.FREE.value
 
-        # Get restaurant layout information if available in step_data
-        if 'Layout' in step_data:
-            layout = step_data['Layout']
-
-            # Set tables
-            for pos in layout.get('tables', []):
-                x, y = pos
-                if 0 <= x < self.grid_width and 0 <= y < self.grid_height:
-                    grid[x][y] = EnvironmentDefinition.FREE_TABLE.value
-
-            # Set kitchen
-            if 'kitchen' in layout:
-                kitchen_cells = layout['kitchen']
-                if isinstance(kitchen_cells, list) or isinstance(kitchen_cells, set):
-                    for pos in kitchen_cells:
-                        x, y = pos
-                        if 0 <= x < self.grid_width and 0 <= y < self.grid_height:
-                            grid[x][y] = EnvironmentDefinition.KITCHEN.value
-                else:
-                    x, y = layout['kitchen']
-                    if 0 <= x < self.grid_width and 0 <= y < self.grid_height:
-                        grid[x][y] = EnvironmentDefinition.KITCHEN.value
-
-        # Place agents
-        for cell in step_data['GridState']:
+        # Handle GridState first (agents and static objects)
+        for cell in reversed(step_data['GridState']):
             x, y = cell['pos']
-            # Ensure coordinates are within bounds
+            # Skip if coordinates are out of bounds
             if x >= self.grid_width or y >= self.grid_height:
                 continue
-            agent_type = cell['type']
-            if agent_type == 'CustomerAgent':
+
+            cell_type = cell['type']
+            if cell_type == 'Table':
+                grid[x][y] = EnvironmentDefinition.FREE_TABLE.value
+            elif cell_type == 'Kitchen':
+                grid[x][y] = EnvironmentDefinition.KITCHEN.value
+
+        # Then add agents in a second pass to ensure they're not overwritten
+        for cell in step_data['GridState']:
+            x, y = cell['pos']
+            # Skip if coordinates are out of bounds
+            if x >= self.grid_width or y >= self.grid_height:
+                continue
+
+            cell_type = cell ['type']
+            if cell_type== 'CustomerAgent':
                 grid[x][y] = EnvironmentDefinition.CUSTOMER.value
-            elif agent_type == 'WaiterAgent':
+            elif cell_type == 'WaiterAgent':
                 grid[x][y] = EnvironmentDefinition.WAITER.value
-            elif agent_type == 'ManagerAgent':
+            elif cell_type == 'ManagerAgent':
                 grid[x][y] = EnvironmentDefinition.MANAGER.value
 
         return grid
