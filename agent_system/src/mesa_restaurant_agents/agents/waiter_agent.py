@@ -136,10 +136,9 @@ class WaiterAgent(mesa.Agent):
         # Filter valid moves (only walkways or kitchen)
         valid_moves = []
         for pos in possible_moves:
-            cell_contents = self.model.grid.get_cell_list_contents(pos)
             is_walkable = (pos in self.model.grid.layout['walkways'] or
                            pos == self.model.grid.layout['kitchen'])
-            if is_walkable and len(cell_contents) == 0:
+            if is_walkable:
                 valid_moves.append(pos)
 
         # Sort by distance to target if we have valid moves

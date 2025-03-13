@@ -8,7 +8,7 @@ import numpy as np
 
 Coordinate = tuple[int, int]
 
-class RestaurantGrid(mesa.space.SingleGrid):
+class RestaurantGrid(mesa.space.MultiGrid):
 
     def __init__(self, width, height, kitchen_pos):
         super().__init__(width, height, True)
@@ -94,22 +94,19 @@ class RestaurantGrid(mesa.space.SingleGrid):
         """Place the agent at the specified location, and set its pos variable."""
         x, y = pos
         # First check if cell is physically occupied
-        if self._grid[x][y] is not None:
-            raise Exception("Cell not empty - already occupied by another agent")
-        # Then check if position type is valid for this agent
-        if self.is_cell_empty_for_agent(agent, pos):
-            x, y = pos
-            self._grid[x][y] = agent
+        if agent.pos is None or agent not in self._grid[x][y]:
+            self._grid[x][y].append(agent)
+            agent.pos = pos
+
             if self._empties_built:
                 self._empties.discard(pos)
             if isinstance(agent, CustomerAgent):
                 self._empties_customers.discard(pos)
             else:
                 self._empties_workers.discard(pos)
-            self._empty_mask[pos] = False
-            agent.pos = pos
+            self._empty_mask[agent.pos] = True
         else:
-            raise Exception("Cell not valid for this agent type")
+            raise Exception("Cell not valid for this agent type: Position " + str(pos) + ", Agent " + str(agent))
 
     def remove_agent(self, agent: mesa.Agent) -> None:
         """Remove the agent from the grid and set its pos attribute to None."""
@@ -123,7 +120,7 @@ class RestaurantGrid(mesa.space.SingleGrid):
             self._empties_customers.add(pos)
         else:
             self._empties_workers.add(pos)
-        self._empty_mask[agent.pos] = True
+        self._empty_mask[agent.pos] = False
         agent.pos = None
 
     def is_walkway(self, pos):
