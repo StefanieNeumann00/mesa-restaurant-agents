@@ -6,7 +6,7 @@ class WaiterDefinition:
     SHIFTS = [1, 2, 3]
 
     # Waiter capacity
-    CAPACITY_WAITER = 20
+    CAPACITY_WAITER = 50
 
     # Waiter type definitions
     class Type(Enum):
