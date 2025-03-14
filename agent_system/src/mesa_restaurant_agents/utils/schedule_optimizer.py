@@ -7,7 +7,12 @@ from pyoptinterface import highs
 
 class ScheduleOptimizer:
     def __init__(self, rf_model=None):
-        self.rf_model = rf_model
+        # Initialize the random forest model
+        best_params = {'max_depth': None, 'min_samples_leaf': 1, 'min_samples_split': 2, 'n_estimators': 50}
+        self.rf_model = RandomForestRegressor(random_state=42, **best_params)
+        # Initialize the optimization model
+        self.opt_model = poi.Model()
+        self.waiter_vars = {}
 
         # Define necessary constants for LP optimization
         self.waiter_types = ["Fulltime", "Parttime"]
@@ -36,17 +41,6 @@ class ScheduleOptimizer:
             2: ["Ana", "Bob", "Alice", "Putri", "Lala", "Johannes", "Steffi", "Feni"],
             3: ["Ana", "Bob", "Alice", "Putri", "Lala", "Steffi", "Feni"]
         }
-
-        # For optimization
-        self.opt_model = None
-        self.waiter_vars = {}
-
-        # Initialize prediction model (for customer demand prediction)
-        if rf_model is None:
-            best_params = {'max_depth': None, 'min_samples_leaf': 1, 'min_samples_split': 2, 'n_estimators': 50}
-            self.rf_model = RandomForestRegressor(random_state=42, **best_params)
-        else:
-            self.rf_model = rf_model
 
         # Make the fulltime and parttime waiters accessible as class variables
         self.fulltime_waiters = self.waiter_name["Fulltime"]
