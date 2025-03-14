@@ -78,6 +78,7 @@ class RestaurantModel(mesa.Model):
         # Create manager
         manager = ManagerAgent(self)
         self.agents.add(manager)
+        self.manager = manager
 
         # Set up model parameters
         self.n_waiters = n_waiters
@@ -183,9 +184,9 @@ class RestaurantModel(mesa.Model):
 
     def calculate_new_customers(self):
         """Calculate number of new customers based on time of day"""
-        base_rate = 1  # Base arrival rate (non-peak)
+        base_rate = 0.5  # Base arrival rate (non-peak)
         if self.is_peak_hour():
-            base_rate = 8  # Increased arrival rate during peak hours
+            base_rate = 6  # Increased arrival rate during peak hours
         return np.random.poisson(base_rate)  # Random variation in arrivals
 
     def add_new_customers(self):
@@ -297,9 +298,54 @@ class RestaurantModel(mesa.Model):
         print(f"DEBUG: After reset - current_minute: {self.current_minute}, day: {self.current_day}")
         print(f"DEBUG: Opening hour: {self.opening_hour}, Closing hour: {self.closing_hour}")
 
+    def create_waiters_for_shift(self, shift_id):
+        """Create waiters for the specified shift based on manager's schedule"""
+        if not self.manager or not hasattr(self.manager, 'schedule'):
+            print(f"Warning: No manager or schedule found for shift {shift_id}")
+            return
+
+        # Get waiters assigned to this shift
+        waiters_for_shift = self.manager.schedule.get(shift_id, [])
+
+        # Remove any existing waiters for this shift
+        waiters_to_remove = [w for w in self.agents.select(agent_type=WaiterAgent)
+                             if hasattr(w, 'shift') and w.shift == shift_id]
+        for waiter in waiters_to_remove:
+            self.grid.remove_agent(waiter)
+            self.agents.remove(waiter)
+
+        # Create new waiters for this shift
+        for i, waiter_id in enumerate(waiters_for_shift):
+            waiter_agent = WaiterAgent(self)
+            waiter_agent.shift = shift_id
+            waiter_agent.unique_id = f"waiter_{shift_id}_{i+1}"
+
+            # Initialize essential serving attributes
+            waiter_agent.current_customer = None
+            waiter_agent.has_order_to_deliver = False
+            waiter_agent.is_available = True
+            waiter_agent.served_customers = 0
+            waiter_agent.tips = 0
+            waiter_agent.avg_rating = 0
+
+            self.agents.add(waiter_agent)
+            self.grid.place_agent(waiter_agent, self.kitchen.pos)
+
+        # Update the count for tracking
+        if self.manager:
+            self.manager.waiters_assigned_count[shift_id] = len(waiters_for_shift)
+
+        print(f"Created {len(waiters_for_shift)} waiters for shift {shift_id}")
+
     def step(self):
         """Advance simulation by one time step"""
         self.current_minute += self.time_step
+
+        # Create waiters at the beginning of each shift
+        for shift_id, shift_info in self.shifts.items():
+            if self.current_minute == shift_info["start"]:
+                print(f"Starting shift {shift_id}: {shift_info['name']}")
+                self.create_waiters_for_shift(shift_id)
 
         # print(f"DEBUG: After reset - current_minute: {self.current_minute}, day: {self.current_day}")
         # print(f"DEBUG: Opening hour: {self.opening_hour}, Closing hour: {self.closing_hour}")
