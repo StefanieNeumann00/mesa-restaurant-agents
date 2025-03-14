@@ -36,14 +36,48 @@ class RestaurantModel(mesa.Model):
         self.time_step = 5
         self.current_minute = self.opening_hour
 
+        # Add day tracking
+        self.current_day = 1
+        self.daily_records = []  # For storing metrics across days
+
+        # Define shifts by time ranges (in minutes)
+        self.shifts = {
+            1: {"name": "Morning", "start": 11 * 60, "end": 15 * 60},  # 11am-3pm
+            2: {"name": "Afternoon", "start": 15 * 60, "end": 19 * 60},  # 3pm-7pm
+            3: {"name": "Evening", "start": 19 * 60, "end": 23 * 60}  # 7pm-11pm
+        }
+
+        # Track customers by shift
+        self.shift_customers = {1: 0, 2: 0, 3: 0}
+
         # Debugging
         print(f"Step {self.current_minute}, Profit: {self.profit}")
         print(f"Active customers: {len(self.agents.select(agent_type=CustomerAgent))}")
 
         # Create agents after environment setup
         WaiterAgent.create_agents(model=self, n=n_waiters)
-        ManagerAgent.create_agents(model=self, n=1)
+
+        # Create waiter agents with assignment of fulltime/part-time
+        fulltime_count = max(1, n_waiters // 2)  # At least 1 fulltime waiter
+        part_time_count = n_waiters - fulltime_count
+
+        # Create fulltime waiters
+        for i in range(fulltime_count):
+            waiter = WaiterAgent(self)
+            waiter.is_fulltime = True
+            self.agents.add(waiter)
+
+        # Create part-time waiters
+        for i in range(part_time_count):
+            waiter = WaiterAgent(self)
+            waiter.is_fulltime = False
+            self.agents.add(waiter)
+
         self.position(self.agents)
+
+        # Create manager
+        manager = ManagerAgent(self)
+        self.agents.add(manager)
 
         # Set up model parameters
         self.n_waiters = n_waiters
@@ -156,12 +190,24 @@ class RestaurantModel(mesa.Model):
 
     def add_new_customers(self):
         n_new = self.calculate_new_customers()
+
+        # Determine current shift
+        current_shift = None
+        for shift_id, shift_info in self.shifts.items():
+            if shift_info["start"] <= self.current_minute < shift_info["end"]:
+                current_shift = shift_id
+                break
+
         for _ in range(n_new):
             customer = CustomerAgent(model=self)
             customer.order_time = self.current_minute
             self.agents.add(customer)
             self.grid.position_randomly(customer)  # Use direct grid positioning
             self.kitchen.add_new_customer_order(customer, customer.food_preference, customer.order_time)
+
+            # Track customer by shift
+            if current_shift:
+                self.shift_customers[current_shift] += 1
 
     def remove_customer(self, customer):
         """Remove customer from restaurant tracking"""
@@ -190,37 +236,114 @@ class RestaurantModel(mesa.Model):
             return 0.0
         return sum(m.daily_stats.get('profit', 0) for m in managers)
 
+    def reset_for_new_day(self):
+        """Reset restaurant state for a new day while preserving persistent data"""
+        # Store daily stats before resetting
+        self.daily_records.append({
+            'day': self.current_day,
+            'customers_paid': self.customers_paid,
+            'customers_left': self.customers_left_without_paying,
+            'profit': self.profit,
+            'avg_satisfaction': self.get_average_satisfaction()
+        })
+
+        print(f"DEBUG: Day {self.current_day} completed, resetting for day {self.current_day + 1}")
+        print(f"DEBUG: Before reset - current_minute: {self.current_minute}")
+
+        # After counters are reset but before advancing day, apply the manager's optimized schedule
+        manager = self.agents.select(agent_type=ManagerAgent)
+        if manager:
+            manager = manager[0]
+            # Apply the manager's optimized schedule for the new day
+            print(f"Applying optimized schedule for day {self.current_day + 1}")
+            print(f"Predicted customers: {manager.predicted_customers}")
+            print(f"Waiters per shift: {manager.waiters_per_shift}")
+
+        # Reset time to opening hour
+        self.current_minute = self.opening_hour
+
+        # Reset daily counters
+        self.customers_paid = 0
+        self.customers_left_without_paying = 0
+        self.profit = 0
+
+        # Reset kitchen orders
+        self.kitchen.requested_orders.clear()
+        self.kitchen.prepared_orders.clear()
+
+        # Reset shift customer counts
+        self.shift_customers = {1: 0, 2: 0, 3: 0}
+
+        # Remove any remaining customers from previous day
+        customers_to_remove = self.agents.select(agent_type=CustomerAgent)
+        for customer in customers_to_remove:
+            self.grid.remove_agent(customer)
+            self.agents.remove(customer)
+
+        # Reset waiters' daily assignments
+        for waiter in self.agents.select(agent_type=WaiterAgent):
+            waiter.current_customer = None
+            waiter.has_order_to_deliver = False
+
+            # Reset position to kitchen
+            self.grid.move_agent(waiter, self.kitchen.pos)
+
+        # Advance day counter
+        self.current_day += 1
+
+        # Reset running flag
+        self.running = True
+
+        print(f"DEBUG: After reset - current_minute: {self.current_minute}, day: {self.current_day}")
+        print(f"DEBUG: Opening hour: {self.opening_hour}, Closing hour: {self.closing_hour}")
+
     def step(self):
         """Advance simulation by one time step"""
         self.current_minute += self.time_step
 
+        # print(f"DEBUG: After reset - current_minute: {self.current_minute}, day: {self.current_day}")
+        # print(f"DEBUG: Opening hour: {self.opening_hour}, Closing hour: {self.closing_hour}")
+
+        # Debug customer generation attempts
+        if self.opening_hour <= self.current_minute < self.closing_hour:
+            self.add_new_customers()
+
         if self.current_minute % 60 == 0:  # Print stats every hour
+            print(f"Day {self.current_day}, Hour {(self.current_minute // 60) % 12 or 12}:")
             print(f"Hour {self.current_minute // 60}:")
             print(f"Customers paid: {self.customers_paid}")
             print(f"Customers left without paying: {self.customers_left_without_paying}")
             print(f"Current profit: ${self.profit:.2f}\n")
 
-        # Process restaurant operations during open hours
-        if self.current_minute > self.closing_hour:
-            self.running = False
-            return
-
         # Process kitchen orders
-        print(f"Kitchen state: {len(self.kitchen.requested_orders)} requested, "
-              f"{len(self.kitchen.prepared_orders)} prepared")
-
         self.kitchen.add_ready_orders_to_prepared(self.current_minute)
 
-        # Update all agents
-        self.agents.shuffle_do("step")
+        # Update all agents EXCEPT the manager at end of day
+        # This prevents the manager's step from being called twice
+        if self.current_minute >= self.closing_hour - self.time_step:
+            for agent in self.agents:
+                if not isinstance(agent, ManagerAgent):
+                    agent.step()
+        else:
+            self.agents.shuffle_do("step")
+
+        # Process manager at end of day explicitly so it happens AFTER all customer data is collected
+        if self.current_minute >= self.closing_hour - self.time_step:
+            manager = next(iter(self.agents.select(agent_type=ManagerAgent)), None)
+            if manager:
+                # Skip redundant manager step call if we're about to transition days
+                if not (self.multi_day_mode and self.current_minute >= self.closing_hour):
+                    manager.step()  # Run manager's end of day processing
+
+        # Handle day transition ONLY when day actually ends
+        if hasattr(self, 'multi_day_mode') and self.multi_day_mode and self.current_minute >= self.closing_hour:
+            print(f"DEBUG: Day {self.current_day} complete, transitioning to day {self.current_day + 1}")
+            self.reset_for_new_day()
+            return  # Important: return after reset to avoid multiple resets
+
+        # print(f"Kitchen state: {len(self.kitchen.requested_orders)} requested, "
+        #      f"{len(self.kitchen.prepared_orders)} prepared")
 
         # Update metrics
         self.customer_count = len(self.agents.select(agent_type=CustomerAgent))
-
-        self.add_new_customers()
-
-        # Check if restaurant is closing
-        if self.current_minute >= self.closing_hour:
-            self.running = False
-
         self.datacollector.collect(self)
