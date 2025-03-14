@@ -48,9 +48,9 @@ class WaiterAgent(mesa.Agent):
         """Add an order to the waiter's carrying load"""
         if self.can_pick_up_food():
             self.carrying_food.append((customer, order))
-        #    print(f"Waiter {self.unique_id} picked up food: {self.carrying_food}")
-        # else:
-        #    print(f"Waiter {self.unique_id} found no food to pick up.")
+            print(f"Waiter {self.unique_id} picked up food: {self.carrying_food}")
+        else:
+            print(f"Waiter {self.unique_id} found no food to pick up.")
 
     def is_ordered(self, agent):
         return (hasattr(agent, "order_status") and
@@ -58,8 +58,8 @@ class WaiterAgent(mesa.Agent):
 
     def get_best_customer(self):
         """Find the best customer to serve based on food being carried."""
-        # print(f"Waiter {self.unique_id} looking for best customer:")
-        # print(f"Currently carrying: {[(c.unique_id if c else 'None', o) for c, o in self.carrying_food]}")
+        print(f"Waiter {self.unique_id} looking for best customer:")
+        print(f"Currently carrying: {[(c.unique_id if c else 'None', o) for c, o in self.carrying_food]}")
 
         ready_customers = [c for c in self.model.agents.select(agent_type=CustomerAgent)
                            if hasattr(c, "order_status") and
@@ -74,7 +74,7 @@ class WaiterAgent(mesa.Agent):
         # First priority: serve customers we have specific food for
         for customer, order in self.carrying_food:
             if customer and customer in ready_customers:
-                # print(f"Found matching customer {customer.unique_id} for carried order")
+                print(f"Found matching customer {customer.unique_id} for carried order")
                 customer.assigned_waiter = [self]
                 return customer
 
@@ -90,8 +90,8 @@ class WaiterAgent(mesa.Agent):
             if matching_customers:
                 # Get customer with longest wait time
                 best_customer = max(matching_customers, key=lambda c: c.waiting_time)
-                # print(f"Reassigning food to customer {best_customer.unique_id} "
-                #      f"(waiting time: {best_customer.waiting_time})")
+                print(f"Reassigning food to customer {best_customer.unique_id} "
+                      f"(waiting time: {best_customer.waiting_time})")
                 best_customer.assigned_waiter = [self]  # Reset assignment
                 return best_customer
 
@@ -104,9 +104,9 @@ class WaiterAgent(mesa.Agent):
         # Third priority: just take the customer that's been waiting longest
         if ready_customers:
             best_customer = ready_customers[0]
-            # print(f"Selected customer {best_customer.unique_id} based on wait time "
-            #     f"({best_customer.waiting_time}) and distance "
-            #     f"({self.manhattan_distance(self.pos, best_customer.pos)})")
+            print(f"Selected customer {best_customer.unique_id} based on wait time "
+                 f"({best_customer.waiting_time}) and distance "
+                 f"({self.manhattan_distance(self.pos, best_customer.pos)})")
             best_customer.assigned_waiter = [self]
             return best_customer
 
@@ -140,7 +140,7 @@ class WaiterAgent(mesa.Agent):
             moves_made += 1
 
         if moves_made > 0:
-            # print(f"Waiter {self.unique_id} moved from {initial_pos} to {self.pos}")
+            print(f"Waiter {self.unique_id} moved from {initial_pos} to {self.pos}")
             return True
 
         return False
