@@ -6,7 +6,6 @@ from pyoptinterface import highs
 from ..utils.waiter_definfitions import WaiterDefinition
 
 
-
 class ScheduleOptimizer:
     def __init__(self, rf_model=None):
         # Initialize the random forest model
@@ -24,7 +23,7 @@ class ScheduleOptimizer:
         self.waiter_total = WaiterDefinition.WAITER_TOTAL
         self.group_A = WaiterDefinition.GROUP_A
         self.group_B = WaiterDefinition.GROUP_B
-        self.waiters_per_shift = WaiterDefinition.WAITERS_PER_SHIFT
+        self.eligible_waiters_by_shift = WaiterDefinition.ELIGIBLE_WAITERS_BY_SHIFT
 
         # Direct access to waiter lists
         self.fulltime_waiters = WaiterDefinition.get_fulltime_waiters()
@@ -107,6 +106,7 @@ class ScheduleOptimizer:
 
         # Update the class's training_data
         self.training_data = pd.concat([self.training_data, pd.DataFrame(new_rows)], ignore_index=True)
+        return self.training_data
 
     def retrain_model(self, df):
 
@@ -118,54 +118,7 @@ class ScheduleOptimizer:
         # Retrain the model with updated data
         self._train_model()
 
-    def create_waiter_schedule(self, waiters, predicted_demand):
-        """Create a schedule based on predicted customer demand"""
-        waiters_available = [w for w in waiters if w.is_available]
-        num_waiters = len(waiters_available)
-        shifts = [1, 2, 3]
-
-        # Always ensure at least some waiters
-        if num_waiters == 0:
-            return {shift: [] for shift in shifts}, {shift: 0 for shift in shifts}
-
-        # Calculate total demand
-        total_demand = sum(predicted_demand.values())
-        min_waiters_per_shift = 2
-
-        schedule = {shift: [] for shift in shifts}
-
-        # Handle case when total demand is zero
-        if total_demand == 0:
-            # Distribute waiters equally across shifts
-            waiters_per_shift = max(min_waiters_per_shift, num_waiters // 3)
-            for shift in shifts:
-                assigned = 0
-                for waiter in waiters_available:
-                    if assigned >= waiters_per_shift:
-                        break
-                    if shift not in waiter.assigned_shifts:
-                        schedule[shift].append(waiter)
-                        waiter.assigned_shifts.append(shift)
-                        assigned += 1
-        else:
-            # Normal case - distribute based on demand
-            for shift in shifts:
-                shift_demand_ratio = predicted_demand[shift] / total_demand
-                shift_waiters_count = max(min_waiters_per_shift,
-                                          round(num_waiters * shift_demand_ratio))
-
-                assigned = 0
-                for waiter in waiters_available:
-                    if assigned >= shift_waiters_count:
-                        break
-                    if shift not in waiter.assigned_shifts:
-                        schedule[shift].append(waiter)
-                        waiter.assigned_shifts.append(shift)
-                        assigned += 1
-
-        return schedule, {shift: len(waiters) for shift, waiters in schedule.items()}
-
-    def create_waiter_schedule(self, waiters, predicted_demand):
+    def create_waiter_schedule(self, waiters, predicted_demand, relax_constraints=False):
         """Create optimal schedule using linear programming"""
         # Get availability information
         waiter_availability = {w.unique_id: w.is_available for w in waiters}
@@ -176,15 +129,9 @@ class ScheduleOptimizer:
         parttime_waiters = [w.unique_id for w in waiters if hasattr(w, 'is_fulltime') and not w.is_fulltime]
 
         # Try solving with strict constraints first
-        model = self._solve_scheduling_problem(waiter_vars, waiter_availability,
-                                               predicted_demand, fulltime_waiters,
-                                               parttime_waiters, relax_constraints=False)
-
-        # If no solution, try with relaxed constraints
-        if model.get_model_attribute(poi.ModelAttribute.TerminationStatus) != poi.TerminationStatusCode.OPTIMAL:
-            model = self._solve_scheduling_problem(waiter_vars, waiter_availability,
-                                                   predicted_demand, fulltime_waiters,
-                                                   parttime_waiters, relax_constraints=True)
+        model = self.solve_scheduling_problem(waiter_vars, waiter_availability,
+                                              predicted_demand, fulltime_waiters,
+                                              parttime_waiters, relax_constraints=relax_constraints)
 
         # Extract schedule from model solution
         schedule = {shift: [] for shift in [1, 2, 3]}
@@ -197,7 +144,7 @@ class ScheduleOptimizer:
 
     def process_actual_data(self, actual_customer_counts):
         # Update training data with actual counts
-        self.training_data = self.update_training_data(self.training_data, actual_customer_counts)
+        self.update_training_data(self.training_data, actual_customer_counts)
 
         # Retrain the model with updated data
         self.retrain_model(self.training_data)
@@ -205,7 +152,9 @@ class ScheduleOptimizer:
         # Return updated predictions for next day
         return self.predict_customer_demand()
 
-    def solve_scheduling_problem(self, waiter_vars, waiter_availability, customer_demands, relax_constraints=False):
+    def solve_scheduling_problem(self, waiter_vars, waiter_availability,
+                                 predicted_demand, fulltime_waiters,
+                                 parttime_waiters, relax_constraints=False):
         """
         Solves the scheduling problem for assigning waiters to shifts based on various constraints.
 
@@ -243,7 +192,7 @@ class ScheduleOptimizer:
                     lb=0, ub=1, domain=poi.VariableDomain.Integer, name=var_name)
 
         # Constraint 1: Each full-time waiter can work at most 2 shifts per day
-        for waiter in self.fulltime_waiters:
+        for waiter in fulltime_waiters:
             model.add_linear_constraint(
                 poi.quicksum(waiter_vars[f"{waiter}_{shift}"] for shift in self.shifts),
                 poi.Leq,
@@ -252,7 +201,7 @@ class ScheduleOptimizer:
             )
 
         # Constraint 2: Each part-time waiter can work at most 1 shift per day
-        for waiter in self.parttime_waiters:
+        for waiter in parttime_waiters:
             model.add_linear_constraint(
                 poi.quicksum(waiter_vars[f"{waiter}_{shift}"] for shift in self.shifts),
                 poi.Leq,
@@ -264,9 +213,9 @@ class ScheduleOptimizer:
         for shift in self.shifts:
             model.add_linear_constraint(
                 poi.quicksum(waiter_vars[f"{waiter}_{shift}"] * self.capacity_waiter for waiter in
-                             self.fulltime_waiters + self.parttime_waiters),
+                             fulltime_waiters + parttime_waiters),
                 poi.Geq,
-                customer_demands[shift],
+                predicted_demand[shift],
                 name=f"shift_{shift}_demand"
             )
 
@@ -274,7 +223,7 @@ class ScheduleOptimizer:
         for shift in self.shifts:
             model.add_linear_constraint(
                 poi.quicksum(
-                    waiter_vars[f"{waiter}_{shift}"] for waiter in self.fulltime_waiters + self.parttime_waiters),
+                    waiter_vars[f"{waiter}_{shift}"] for waiter in fulltime_waiters + parttime_waiters),
                 poi.Geq,
                 2,
                 name=f"shift_{shift}_min_two_waiters"
@@ -283,8 +232,8 @@ class ScheduleOptimizer:
         # Constraint 5: Only specific waiters can work in each shift
         if not relax_constraints:  # Relax Constraint 2, less critical prioritization
             for shift in self.shifts:
-                for waiter in self.fulltime_waiters + self.parttime_waiters:
-                    if waiter not in self.waiters_per_shift[shift]:
+                for waiter in fulltime_waiters + parttime_waiters:
+                    if waiter not in self.eligible_waiters_by_shift[shift]:
                         model.add_linear_constraint(
                             waiter_vars[f"{waiter}_{shift}"],
                             poi.Eq,
@@ -306,7 +255,7 @@ class ScheduleOptimizer:
 
         # Constraint 7: Only available waiters can be assigned to shifts
         if not relax_constraints:
-            for waiter in self.fulltime_waiters + self.parttime_waiters:
+            for waiter in fulltime_waiters + parttime_waiters:
                 if not waiter_availability[waiter]:
                     for shift in self.shifts:
                         model.add_linear_constraint(
