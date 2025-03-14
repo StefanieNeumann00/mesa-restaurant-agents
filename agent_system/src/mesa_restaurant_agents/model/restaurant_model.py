@@ -257,7 +257,7 @@ class RestaurantModel(mesa.Model):
             # Apply the manager's optimized schedule for the new day
             print(f"Applying optimized schedule for day {self.current_day + 1}")
             print(f"Predicted customers: {manager.predicted_customers}")
-            print(f"Waiters per shift: {manager.waiters_per_shift}")
+            print(f"Waiters per shift: {manager.waiters_assigned_count}")
 
         # Reset time to opening hour
         self.current_minute = self.opening_hour
@@ -321,7 +321,8 @@ class RestaurantModel(mesa.Model):
         # Update all agents EXCEPT the manager at end of day
         # This prevents the manager's step from being called twice
         if self.current_minute >= self.closing_hour - self.time_step:
-            for agent in self.agents:
+            agents_copy = list(self.agents)
+            for agent in agents_copy:
                 if not isinstance(agent, ManagerAgent):
                     agent.step()
         else:
