@@ -11,7 +11,7 @@ class ScheduleOptimizer:
         best_params = {'max_depth': None, 'min_samples_leaf': 1, 'min_samples_split': 2, 'n_estimators': 50}
         self.rf_model = RandomForestRegressor(random_state=42, **best_params)
         # Initialize the optimization model
-        self.opt_model = poi.Model()
+        self.opt_model = highs.Model()
         self.waiter_vars = {}
 
         # Define necessary constants for LP optimization
