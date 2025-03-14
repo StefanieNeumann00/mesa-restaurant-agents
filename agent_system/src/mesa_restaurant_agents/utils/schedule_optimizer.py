@@ -3,6 +3,8 @@ from sklearn.ensemble import RandomForestRegressor
 import pandas as pd
 import pyoptinterface as poi
 from pyoptinterface import highs
+from ..utils.waiter_definfitions import WaiterDefinition
+
 
 
 class ScheduleOptimizer:
@@ -14,37 +16,19 @@ class ScheduleOptimizer:
         self.opt_model = highs.Model()
         self.waiter_vars = {}
 
-        # Define necessary constants for LP optimization
-        self.waiter_types = ["Fulltime", "Parttime"]
-        self.shifts = [1, 2, 3]
-        self.capacity_waiter = 20
+        # Initialize model attributes using WaiterDefinition class
+        self.waiter_types = [t.value for t in WaiterDefinition.Type]
+        self.shifts = WaiterDefinition.SHIFTS
+        self.capacity_waiter = WaiterDefinition.CAPACITY_WAITER
+        self.waiter_name = WaiterDefinition.WAITER_NAMES
+        self.waiter_total = WaiterDefinition.WAITER_TOTAL
+        self.group_A = WaiterDefinition.GROUP_A
+        self.group_B = WaiterDefinition.GROUP_B
+        self.waiters_per_shift = WaiterDefinition.WAITERS_PER_SHIFT
 
-        # Waiter name definitions
-        self.waiter_name = {
-            "Fulltime": ["Ana", "Bob", "Alice", "Putri", "Lala"],
-            "Parttime": ["Laura", "Bill", "Feni", "Steffi", "Johannes"]
-        }
-
-        # Waiter total definitions
-        self.waiter_total = {
-            "Fulltime": 5,
-            "Parttime": 5
-        }
-
-        # Define groups for constraint
-        self.group_A = ["Ana", "Bob", "Alice"]
-        self.group_B = ["Putri", "Lala", "Laura"]
-
-        # Waiters per shift preferences
-        self.waiters_per_shift = {
-            1: ["Ana", "Bob", "Putri", "Lala", "Laura", "Bill", "Johannes", "Steffi"],
-            2: ["Ana", "Bob", "Alice", "Putri", "Lala", "Johannes", "Steffi", "Feni"],
-            3: ["Ana", "Bob", "Alice", "Putri", "Lala", "Steffi", "Feni"]
-        }
-
-        # Make the fulltime and parttime waiters accessible as class variables
-        self.fulltime_waiters = self.waiter_name["Fulltime"]
-        self.parttime_waiters = self.waiter_name["Parttime"]
+        # Direct access to waiter lists
+        self.fulltime_waiters = WaiterDefinition.get_fulltime_waiters()
+        self.parttime_waiters = WaiterDefinition.get_parttime_waiters()
 
         # Initialize waiter_vars as a class variable
         self.waiter_vars = {}
@@ -106,7 +90,7 @@ class ScheduleOptimizer:
         rounded_counts = np.round(actual_customer_counts).astype(int)
 
         # Get last group number and increment
-        last_group = df['Group'].max()
+        last_group = self.training_data['Group'].max()
         if pd.isna(last_group):
             new_group = 1
         else:
@@ -114,14 +98,15 @@ class ScheduleOptimizer:
 
         # Create new rows with actual data
         new_rows = []
-        for i, customers in enumerate(actual_customer_counts):
+        for i, customers in enumerate(rounded_counts):
             new_rows.append({
                 'Group': new_group,
                 'Shift': i + 1,
                 'Customers': customers
             })
 
-        return pd.concat([df, pd.DataFrame(new_rows)], ignore_index=True)
+        # Update the class's training_data
+        self.training_data = pd.concat([self.training_data, pd.DataFrame(new_rows)], ignore_index=True)
 
     def retrain_model(self, df):
 
@@ -212,10 +197,10 @@ class ScheduleOptimizer:
 
     def process_actual_data(self, actual_customer_counts):
         # Update training data with actual counts
-        self.update_training_data(actual_customer_counts)
+        self.training_data = self.update_training_data(self.training_data, actual_customer_counts)
 
         # Retrain the model with updated data
-        self.retrain_model()
+        self.retrain_model(self.training_data)
 
         # Return updated predictions for next day
         return self.predict_customer_demand()
