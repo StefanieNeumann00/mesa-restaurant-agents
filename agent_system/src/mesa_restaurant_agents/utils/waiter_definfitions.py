@@ -30,7 +30,7 @@ class WaiterDefinition:
     GROUP_B = ["Putri", "Lala", "Laura"]
 
     # Waiters per shift preferences
-    WAITERS_PER_SHIFT: Dict[int, List[str]] = {
+    ELIGIBLE_WAITERS_BY_SHIFT: Dict[int, List[str]] = {
         1: ["Ana", "Bob", "Putri", "Lala", "Laura", "Bill", "Johannes", "Steffi"],
         2: ["Ana", "Bob", "Alice", "Putri", "Lala", "Johannes", "Steffi", "Feni"],
         3: ["Ana", "Bob", "Alice", "Putri", "Lala", "Steffi", "Feni"]
