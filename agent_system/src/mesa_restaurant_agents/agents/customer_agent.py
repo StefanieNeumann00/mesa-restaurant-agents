@@ -14,7 +14,7 @@ class CustomerAgent(mesa.Agent):
         self.satisfaction = 100                       # Overall satisfaction (0-100)
         self.tip = 0                                  # Amount of tip given
         self.assigned_waiter = []                     # Reference to assigned waiter
-        self.dining_duration = random.randint(90, 180)  # Time to spend at restaurant
+        self.dining_duration = random.randint(60, 120)  # Time to spend at restaurant
         self._served_logged = False
 
     def step(self):
