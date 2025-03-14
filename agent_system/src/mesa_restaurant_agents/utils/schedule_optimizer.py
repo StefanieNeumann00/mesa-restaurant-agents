@@ -1,29 +1,72 @@
-# Create a new file: schedule_optimizer.py
 import numpy as np
 from sklearn.ensemble import RandomForestRegressor
 import pandas as pd
-import os
+import pyoptinterface as poi
+from pyoptinterface import highs
+
 
 class ScheduleOptimizer:
-    def __init__(self, training_data_path="training_data_customers.csv"):
-        self.training_data_path = training_data_path
-        self.rf_model = RandomForestRegressor(random_state=42, n_estimators=50)
+    def __init__(self, rf_model=None):
+        self.rf_model = rf_model
+
+        # Define necessary constants for LP optimization
+        self.waiter_types = ["Fulltime", "Parttime"]
+        self.shifts = [1, 2, 3]
+        self.capacity_waiter = 20
+
+        # Waiter name definitions
+        self.waiter_name = {
+            "Fulltime": ["Ana", "Bob", "Alice", "Putri", "Lala"],
+            "Parttime": ["Laura", "Bill", "Feni", "Steffi", "Johannes"]
+        }
+
+        # Waiter total definitions
+        self.waiter_total = {
+            "Fulltime": 5,
+            "Parttime": 5
+        }
+
+        # Define groups for constraint
+        self.group_A = ["Ana", "Bob", "Alice"]
+        self.group_B = ["Putri", "Lala", "Laura"]
+
+        # Waiters per shift preferences
+        self.waiters_per_shift = {
+            1: ["Ana", "Bob", "Putri", "Lala", "Laura", "Bill", "Johannes", "Steffi"],
+            2: ["Ana", "Bob", "Alice", "Putri", "Lala", "Johannes", "Steffi", "Feni"],
+            3: ["Ana", "Bob", "Alice", "Putri", "Lala", "Steffi", "Feni"]
+        }
+
+        # Initialize the Random Forest model with best parameters
+        best_params = {'max_depth': None, 'min_samples_leaf': 1, 'min_samples_split': 2, 'n_estimators': 50}
+        self.rf_model = RandomForestRegressor(random_state=42, **best_params)
+
+        # Make the fulltime and parttime waiters accessible as class variables
+        self.fulltime_waiters = self.waiter_name["Fulltime"]
+        self.parttime_waiters = self.waiter_name["Parttime"]
+
+        # Initialize waiter_vars as a class variable
+        self.waiter_vars = {}
+        for waiter_type in self.waiter_types:
+            for waiter in self.waiter_name[waiter_type]:
+                for shift in self.shifts:
+                    var_name = f"{waiter}_{shift}"
+                    self.waiter_vars[var_name] = self.rf_model.add_variable(lb=0, ub=1,
+                                                                            domain=poi.VariableDomain.Integer,
+                                                                            name=var_name)
+
         self.training_data = pd.DataFrame()
         self._initialize_training_data()
         self._train_model()
 
     def _initialize_training_data(self):
-        """Initialize or load customer training data"""
-        if os.path.exists(self.training_data_path):
-            self.training_data = pd.read_csv(self.training_data_path)
-        else:
-            # Create initial training data if none exists
-            self.training_data = pd.DataFrame({
-                'Group': [1, 1, 1],
-                'Shift': [1, 2, 3],
-                'Customers': [45, 70, 35]
-            })
-            self.training_data.to_csv(self.training_data_path, index=False)
+        """Initialize training data with default values"""
+        # Create initial training data if none exists
+        self.training_data = pd.DataFrame({
+            'Group': [1, 1, 1],
+            'Shift': [1, 2, 3],
+            'Customers': [45, 70, 35]
+        })
 
     def _train_model(self):
         """Train the random forest model using available data"""
@@ -37,18 +80,36 @@ class ScheduleOptimizer:
     def predict_customer_demand(self):
         """Predict customer demand for each shift"""
         shifts = [1, 2, 3]
-        customer_data = np.array([[1], [2], [3]])
-        predictions = self.rf_model.predict(customer_data)
-        return {shift: round(predictions[i-1], 0) for i, shift in enumerate(shifts, 1)}
 
-    def update_training_data(self, actual_customer_counts):
+        # Default values in case prediction fails
+        default_prediction = {1: 30, 2: 50, 3: 40}
+
+        try:
+            customer_data = np.array([[1], [2], [3]])
+            predictions = self.rf_model.predict(customer_data)
+
+            # Create prediction dictionary from model outputs
+            predicted_demand = {shift: max(20, round(predictions[i - 1]))
+                                for i, shift in enumerate(shifts)}
+
+            return predicted_demand
+        except Exception as e:
+            print(f"Warning: Customer prediction failed with error: {e}")
+            return default_prediction
+
+    def update_training_data(self, df, actual_customer_counts):
         """Add actual customer data to training dataset and retrain model"""
         if len(actual_customer_counts) != 3:
             return
 
+        rounded_counts = np.round(actual_customer_counts).astype(int)
+
         # Get last group number and increment
-        last_group = self.training_data['Group'].max() if not self.training_data.empty else 0
-        new_group = last_group + 1
+        last_group =  df['Group'].max()
+        if pd.isna(last_group):
+            new_group = 1
+        else:
+            new_group = last_group + 1
 
         # Create new rows with actual data
         new_rows = []
@@ -56,43 +117,225 @@ class ScheduleOptimizer:
             new_rows.append({
                 'Group': new_group,
                 'Shift': i + 1,
-                'Customers': round(customers)
+                'Customers': customers
             })
 
-        # Add to training data and save
-        self.training_data = pd.concat([self.training_data, pd.DataFrame(new_rows)],
-                                      ignore_index=True)
-        self.training_data.to_csv(self.training_data_path, index=False)
+        return pd.concat([df, pd.DataFrame(new_rows)], ignore_index=True)
+
+    def retrain_model(self, df):
+
+        X = df[['Shift']]
+        y = df['Customers']
+
+        self.rf_model.fit(X, y)
 
         # Retrain the model with updated data
         self._train_model()
 
     def create_waiter_schedule(self, waiters, predicted_demand):
         """Create a schedule based on predicted customer demand"""
-        # Simple version - in a full implementation,
-        # you'd include the linear programming code from the notebook
         waiters_available = [w for w in waiters if w.is_available]
         num_waiters = len(waiters_available)
         shifts = [1, 2, 3]
 
-        # Simple allocation based on predicted demand
+        # Always ensure at least some waiters
+        if num_waiters == 0:
+            return {shift: [] for shift in shifts}, {shift: 0 for shift in shifts}
+
+        # Calculate total demand
         total_demand = sum(predicted_demand.values())
         min_waiters_per_shift = 2
 
         schedule = {shift: [] for shift in shifts}
 
-        for shift in shifts:
-            shift_demand_ratio = predicted_demand[shift] / total_demand if total_demand > 0 else 1/3
-            shift_waiters_count = max(min_waiters_per_shift,
-                                     round(num_waiters * shift_demand_ratio))
+        # Handle case when total demand is zero
+        if total_demand == 0:
+            # Distribute waiters equally across shifts
+            waiters_per_shift = max(min_waiters_per_shift, num_waiters // 3)
+            for shift in shifts:
+                assigned = 0
+                for waiter in waiters_available:
+                    if assigned >= waiters_per_shift:
+                        break
+                    if shift not in waiter.assigned_shifts:
+                        schedule[shift].append(waiter)
+                        waiter.assigned_shifts.append(shift)
+                        assigned += 1
+        else:
+            # Normal case - distribute based on demand
+            for shift in shifts:
+                shift_demand_ratio = predicted_demand[shift] / total_demand
+                shift_waiters_count = max(min_waiters_per_shift,
+                                          round(num_waiters * shift_demand_ratio))
 
-            assigned = 0
-            for waiter in waiters_available:
-                if assigned >= shift_waiters_count:
-                    break
-                if shift not in waiter.assigned_shifts:
-                    schedule[shift].append(waiter)
-                    waiter.assigned_shifts.append(shift)
-                    assigned += 1
+                assigned = 0
+                for waiter in waiters_available:
+                    if assigned >= shift_waiters_count:
+                        break
+                    if shift not in waiter.assigned_shifts:
+                        schedule[shift].append(waiter)
+                        waiter.assigned_shifts.append(shift)
+                        assigned += 1
 
         return schedule, {shift: len(waiters) for shift, waiters in schedule.items()}
+
+    def create_waiter_schedule(self, waiters, predicted_demand):
+        """Create optimal schedule using linear programming"""
+        # Get availability information
+        waiter_availability = {w.unique_id: w.is_available for w in waiters}
+        waiter_vars = {}
+
+        # Convert waiters to proper format for solver
+        fulltime_waiters = [w.unique_id for w in waiters if hasattr(w, 'is_fulltime') and w.is_fulltime]
+        parttime_waiters = [w.unique_id for w in waiters if hasattr(w, 'is_fulltime') and not w.is_fulltime]
+
+        # Try solving with strict constraints first
+        model = self._solve_scheduling_problem(waiter_vars, waiter_availability,
+                                               predicted_demand, fulltime_waiters,
+                                               parttime_waiters, relax_constraints=False)
+
+        # If no solution, try with relaxed constraints
+        if model.get_model_attribute(poi.ModelAttribute.TerminationStatus) != poi.TerminationStatusCode.OPTIMAL:
+            model = self._solve_scheduling_problem(waiter_vars, waiter_availability,
+                                                   predicted_demand, fulltime_waiters,
+                                                   parttime_waiters, relax_constraints=True)
+
+        # Extract schedule from model solution
+        schedule = {shift: [] for shift in [1, 2, 3]}
+        for var_name, var in waiter_vars.items():
+            if model.get_value(var) > 0.5:
+                waiter_id, shift = var_name.rsplit('_', 1)
+                schedule[int(shift)].append(next(w for w in waiters if str(w.unique_id) == waiter_id))
+
+        return schedule, {shift: len(waiters) for shift, waiters in schedule.items()}
+
+    def process_actual_data(self, actual_customer_counts):
+        # Update training data with actual counts
+        self.update_training_data(actual_customer_counts)
+
+        # Retrain the model with updated data
+        self.retrain_model()
+
+        # Return updated predictions for next day
+        return self.predict_customer_demand()
+
+    def solve_scheduling_problem(self, waiter_vars, waiter_availability, customer_demands, relax_constraints=False):
+        """
+        Solves the scheduling problem for assigning waiters to shifts based on various constraints.
+
+        Parameters:
+        waiter_vars (dict): Dictionary to store the decision variables for each waiter in each shift.
+        waiter_availability (dict): Dictionary indicating the availability of each waiter.
+        relax_constraints (bool): Flag to indicate whether to relax certain constraints for feasibility.
+        customer_demands (dict): Dictionary indicating the number of customer demands
+
+        Returns:
+        model: The optimized model with the scheduling solution.
+
+        Description:
+        This function creates and solves an optimization model to assign waiters to shifts while satisfying
+        several constraints. The constraints include:
+        1. Each full-time waiter can work at most 2 shifts per day (or 3 if constraints are relaxed).
+        2. Each part-time waiter can work at most 1 shift per day (or 2 if constraints are relaxed).
+        3. The total capacity in each shift must meet or exceed customer demands.
+        4. Each shift must have at least 2 waiters.
+        5. Only specific waiters can work in each shift.
+        6. People in Group A and Group B cannot work together in the same shift.
+        7. Only available waiters can be assigned to shifts.
+
+        The objective of the model is to minimize the total number of waiters assigned to shifts.
+
+        The function returns the optimized model with the scheduling solution.
+        """
+        model = highs.Model()  # Create a new instance of the model
+
+        # Define variables for each waiter in each shift
+        for waiter in waiter_availability:
+            for shift in self.shifts:
+                var_name = f"{waiter}_{shift}"
+                waiter_vars[var_name] = model.add_variable(
+                    lb=0, ub=1, domain=poi.VariableDomain.Integer, name=var_name)
+
+        # Constraint 1: Each full-time waiter can work at most 2 shifts per day
+        for waiter in self.fulltime_waiters:
+            model.add_linear_constraint(
+                poi.quicksum(waiter_vars[f"{waiter}_{shift}"] for shift in self.shifts),
+                poi.Leq,
+                2,
+                name=f"{waiter}_fulltime_max_two_shifts"
+            )
+
+        # Constraint 2: Each part-time waiter can work at most 1 shift per day
+        for waiter in self.parttime_waiters:
+            model.add_linear_constraint(
+                poi.quicksum(waiter_vars[f"{waiter}_{shift}"] for shift in self.shifts),
+                poi.Leq,
+                1 if not relax_constraints else 2,  # Relax constraint if needed
+                name=f"{waiter}_parttime_max_one_shift"
+            )
+
+        # Constraint 3: The total capacity in each shift must meet or exceed customer demands
+        for shift in self.shifts:
+            model.add_linear_constraint(
+                poi.quicksum(waiter_vars[f"{waiter}_{shift}"] * self.capacity_waiter for waiter in
+                             self.fulltime_waiters + self.parttime_waiters),
+                poi.Geq,
+                customer_demands[shift],
+                name=f"shift_{shift}_demand"
+            )
+
+        # Constraint 4: Each shift must have at least 2 waiters
+        for shift in self.shifts:
+            model.add_linear_constraint(
+                poi.quicksum(waiter_vars[f"{waiter}_{shift}"] for waiter in self.fulltime_waiters + self.parttime_waiters),
+                poi.Geq,
+                2,
+                name=f"shift_{shift}_min_two_waiters"
+            )
+
+        # Constraint 5: Only specific waiters can work in each shift
+        if not relax_constraints:  # Relax Constraint 2, less critical prioritization
+            for shift in self.shifts:
+                for waiter in self.fulltime_waiters + self.parttime_waiters:
+                    if waiter not in self.waiters_per_shift[shift]:
+                        model.add_linear_constraint(
+                            waiter_vars[f"{waiter}_{shift}"],
+                            poi.Eq,
+                            0,
+                            name=f"{waiter}_not_in_shift_{shift}"
+                        )
+
+        # Constraint 6: People in Group A and Group B cannot work together in the same shift
+        if not relax_constraints:  # Relax Constraint 2, less critical prioritization
+            for shift in self.shifts:
+                for waiter_A in self.group_A:
+                    for waiter_B in self.group_B:
+                        model.add_linear_constraint(
+                            waiter_vars[f"{waiter_A}_{shift}"] + waiter_vars[f"{waiter_B}_{shift}"],
+                            poi.Leq,
+                            1,
+                            name=f"group_A_B_not_together_shift_{shift}"
+                        )
+
+        # Constraint 7: Only available waiters can be assigned to shifts
+        if not relax_constraints:
+            for waiter in self.fulltime_waiters + self.parttime_waiters:
+                if not waiter_availability[waiter]:
+                    for shift in self.shifts:
+                        model.add_linear_constraint(
+                            waiter_vars[f"{waiter}_{shift}"],
+                            poi.Eq,
+                            0,
+                            name=f"{waiter}_not_available"
+                        )
+
+        # Objective: Minimize the total number of waiters assigned
+        model.set_objective(
+            poi.quicksum(waiter_vars[var] for var in waiter_vars),
+            poi.ObjectiveSense.Minimize
+        )
+
+        model.set_model_attribute(poi.ModelAttribute.Silent, False)
+        model.optimize()
+
+        return model
