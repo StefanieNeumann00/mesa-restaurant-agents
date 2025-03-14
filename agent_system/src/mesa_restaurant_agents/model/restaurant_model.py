@@ -14,7 +14,7 @@ class RestaurantModel(mesa.Model):
 
         self.grid_height = grid_height if grid_height % 2 != 0 else grid_height + 1  # make sure grid_height is uneven
         self.grid_width = grid_width if grid_width % 2 != 0 else grid_width + 1  # make sure grid_width is uneven
-        self.grid = mesa.space.SingleGrid(self.grid_width, self.grid_height, True)
+        # self.grid = mesa.space.SingleGrid(self.grid_width, self.grid_height, True)
 
         # Set up environment
         kitchen_x = (self.grid_width // 2) + 2 if self.grid_width % 2 == 1 else (self.grid_width // 2) + 2
@@ -98,7 +98,11 @@ class RestaurantModel(mesa.Model):
 
     def position(self, agents):
         for agent in agents:
-            if not self.grid.position_randomly(agent):
+            # Place waiters at the kitchen position
+            if isinstance(agent, WaiterAgent):
+                self.grid.place_agent(agent, self.kitchen.pos)
+            # Position other agent types randomly
+            elif not self.grid.position_randomly(agent):
                 self.agents.remove(agent)
 
     def get_customer_info(self, agents):
@@ -145,9 +149,9 @@ class RestaurantModel(mesa.Model):
 
     def calculate_new_customers(self):
         """Calculate number of new customers based on time of day"""
-        base_rate = 5  # Base arrival rate (non-peak)
+        base_rate = 1  # Base arrival rate (non-peak)
         if self.is_peak_hour():
-            base_rate = 11  # Increased arrival rate during peak hours
+            base_rate = 8  # Increased arrival rate during peak hours
         return np.random.poisson(base_rate)  # Random variation in arrivals
 
     def add_new_customers(self):
