@@ -2,6 +2,8 @@ from ..utils.order_status import OrderStatus, food_options
 from ..agents.customer_agent import CustomerAgent
 from ..agents.waiter_agent import WaiterAgent
 from ..utils.schedule_optimizer import ScheduleOptimizer
+from ..utils.waiter_definfitions import WaiterDefinition
+
 
 import mesa
 import numpy as np
@@ -21,9 +23,16 @@ class ManagerAgent(mesa.Agent):
 
         # Initialize schedule optimizer# Initialize optimizer
         self.schedule_optimizer = ScheduleOptimizer()
-        self.shifts = [1, 2, 3]
+
+        # Essential properties from WaiterDefinition
+        self.shifts = WaiterDefinition.SHIFTS
+        self.fulltime_waiters = WaiterDefinition.get_fulltime_waiters()
+        self.parttime_waiters = WaiterDefinition.get_parttime_waiters()
+        self.eligible_waiters = WaiterDefinition.ELIGIBLE_WAITERS_BY_SHIFT
+
+        # For storing the current schedule state
         self.predicted_customers = {shift: 0 for shift in self.shifts}
-        self.waiters_per_shift = {shift: 0 for shift in self.shifts}
+        self.waiters_assigned_count = {shift: 0 for shift in self.shifts}
         self.schedule = {}  # Initialize empty schedule
 
     def step(self):
@@ -31,7 +40,7 @@ class ManagerAgent(mesa.Agent):
         model = self.model
         self.daily_stats['total_customers'] = len(model.agents.select(agent_type=CustomerAgent))
         self.daily_stats['active_waiters'] = len([w for w in model.agents.select(agent_type=WaiterAgent)])
-        self.daily_stats['avg_waiting_time'] = np.mean([c.waiting_time for c in model.agents.select(agent_type=CustomerAgent)])
+        self.daily_stats['avg_waiting_time'] = int(round(np.mean([c.waiting_time for c in model.agents.select(agent_type=CustomerAgent)] or [0])))
         self.calculate_profit()
 
         # Daily scheduling and predictions (at restaurant opening)
@@ -51,10 +60,14 @@ class ManagerAgent(mesa.Agent):
 
             # Create schedule for today's waiters
             waiters = model.agents.select(agent_type=WaiterAgent)
-            self.schedule, self.waiters_per_shift = self.schedule_optimizer.create_waiter_schedule(
-                waiters, self.predicted_customers
-            )
-            print(f"Waiters assigned per shift: {self.waiters_per_shift}")
+
+            print(f"Waiters assigned per shift: {self.waiters_assigned_count}")
+
+            # Print detailed schedule information
+            for shift in self.shifts:
+                waiters_in_shift = self.schedule.get(shift, [])
+                waiter_names = [w.unique_id for w in waiters_in_shift]
+                print(f"Shift {shift}: {', '.join(waiter_names)}")
 
         # At end of day, update training data with actual customer counts
         if self.model.current_minute >= self.model.closing_hour - self.model.time_step:
@@ -67,6 +80,7 @@ class ManagerAgent(mesa.Agent):
 
             updated_predictions = self.schedule_optimizer.process_actual_data(actual_data)
             self.predicted_customers = updated_predictions
+            print(f"Updated predictions after processing actual data: {self.predicted_customers}")
 
             # Reset shift counters for next day
             self.model.shift_customers = {1: 0, 2: 0, 3: 0}
