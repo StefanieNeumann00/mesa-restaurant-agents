@@ -37,9 +37,16 @@ class ScheduleOptimizer:
             3: ["Ana", "Bob", "Alice", "Putri", "Lala", "Steffi", "Feni"]
         }
 
-        # Initialize the Random Forest model with best parameters
-        best_params = {'max_depth': None, 'min_samples_leaf': 1, 'min_samples_split': 2, 'n_estimators': 50}
-        self.rf_model = RandomForestRegressor(random_state=42, **best_params)
+        # For optimization
+        self.opt_model = None
+        self.waiter_vars = {}
+
+        # Initialize prediction model (for customer demand prediction)
+        if rf_model is None:
+            best_params = {'max_depth': None, 'min_samples_leaf': 1, 'min_samples_split': 2, 'n_estimators': 50}
+            self.rf_model = RandomForestRegressor(random_state=42, **best_params)
+        else:
+            self.rf_model = rf_model
 
         # Make the fulltime and parttime waiters accessible as class variables
         self.fulltime_waiters = self.waiter_name["Fulltime"]
@@ -51,9 +58,9 @@ class ScheduleOptimizer:
             for waiter in self.waiter_name[waiter_type]:
                 for shift in self.shifts:
                     var_name = f"{waiter}_{shift}"
-                    self.waiter_vars[var_name] = self.rf_model.add_variable(lb=0, ub=1,
-                                                                            domain=poi.VariableDomain.Integer,
-                                                                            name=var_name)
+                    self.waiter_vars[var_name] = self.opt_model.add_variable(lb=0, ub=1,
+                                                                             domain=poi.VariableDomain.Integer,
+                                                                             name=var_name)
 
         self.training_data = pd.DataFrame()
         self._initialize_training_data()
@@ -105,7 +112,7 @@ class ScheduleOptimizer:
         rounded_counts = np.round(actual_customer_counts).astype(int)
 
         # Get last group number and increment
-        last_group =  df['Group'].max()
+        last_group = df['Group'].max()
         if pd.isna(last_group):
             new_group = 1
         else:
@@ -287,7 +294,8 @@ class ScheduleOptimizer:
         # Constraint 4: Each shift must have at least 2 waiters
         for shift in self.shifts:
             model.add_linear_constraint(
-                poi.quicksum(waiter_vars[f"{waiter}_{shift}"] for waiter in self.fulltime_waiters + self.parttime_waiters),
+                poi.quicksum(
+                    waiter_vars[f"{waiter}_{shift}"] for waiter in self.fulltime_waiters + self.parttime_waiters),
                 poi.Geq,
                 2,
                 name=f"shift_{shift}_min_two_waiters"
