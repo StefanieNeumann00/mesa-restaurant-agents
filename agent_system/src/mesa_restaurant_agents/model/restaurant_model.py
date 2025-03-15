@@ -28,7 +28,6 @@ class RestaurantModel(mesa.Model):
         self.customers_left_without_paying = 0
         self.customer_count = 0
         self.daily_customers = []
-        self.kitchen_access = None  # Track which waiter has kitchen access
 
         # Time settings
         self.opening_hour = 11 * 60
@@ -53,9 +52,6 @@ class RestaurantModel(mesa.Model):
         # Debugging
         print(f"Step {self.current_minute}, Profit: {self.profit}")
         print(f"Active customers: {len(self.agents.select(agent_type=CustomerAgent))}")
-
-        # Create agents after environment setup
-        WaiterAgent.create_agents(model=self, n=n_waiters)
 
         # Create waiter agents with assignment of fulltime/part-time
         fulltime_count = max(1, n_waiters // 2)  # At least 1 fulltime waiter
@@ -162,18 +158,6 @@ class RestaurantModel(mesa.Model):
             w_infos.append(w_info)
         return w_infos
 
-    def reserve_kitchen_access(self, agent):
-        """Reserve exclusive access to the kitchen for an agent"""
-        if self.kitchen_access is None or self.kitchen_access == agent:
-            self.kitchen_access = agent
-            return True
-        return False
-
-    def release_kitchen_access(self, agent):
-        """Release kitchen access when agent leaves"""
-        if self.kitchen_access == agent:
-            self.kitchen_access = None
-
     def get_customers_count(self, agents):
         return len(agents.select(agent_type=CustomerAgent))
 
@@ -186,7 +170,7 @@ class RestaurantModel(mesa.Model):
         """Calculate number of new customers based on time of day"""
         base_rate = 0.5  # Base arrival rate (non-peak)
         if self.is_peak_hour():
-            base_rate = 6  # Increased arrival rate during peak hours
+            base_rate = 4  # Increased arrival rate during peak hours
         return np.random.poisson(base_rate)  # Random variation in arrivals
 
     def add_new_customers(self):
@@ -239,26 +223,44 @@ class RestaurantModel(mesa.Model):
 
     def reset_for_new_day(self):
         """Reset restaurant state for a new day while preserving persistent data"""
+        # Calculate additional stats
+        stats = self.get_daily_stats()
+
+        # Print revenue report
+        print(f"===== Day {self.current_day} Revenue Report =====")
+        print(f"Food revenue: ${stats['food_revenue']:.2f}")
+        print(f"Tips collected: ${stats['tips']:.2f}")
+        print(f"Total revenue: ${stats['total_revenue']:.2f}")
+        print(f"Customers paid: {stats['customers_paid']}")
+        print(f"Customers left without paying: {stats['customers_left']}")
+        print(f"Total orders served: {stats['served_customers']}")
+        print(f"===================================")
+
         # Store daily stats before resetting
         self.daily_records.append({
             'day': self.current_day,
             'customers_paid': self.customers_paid,
             'customers_left': self.customers_left_without_paying,
             'profit': self.profit,
+            'food_revenue': stats['food_revenue'],
+            'tips': stats['tips'],
+            'served_orders': stats['served_customers'],
             'avg_satisfaction': self.get_average_satisfaction()
         })
 
+        # Before advancing day counter, apply the manager's optimized schedule
         print(f"DEBUG: Day {self.current_day} completed, resetting for day {self.current_day + 1}")
         print(f"DEBUG: Before reset - current_minute: {self.current_minute}")
 
-        # After counters are reset but before advancing day, apply the manager's optimized schedule
-        manager = self.agents.select(agent_type=ManagerAgent)
-        if manager:
-            manager = manager[0]
-            # Apply the manager's optimized schedule for the new day
-            print(f"Applying optimized schedule for day {self.current_day + 1}")
-            print(f"Predicted customers: {manager.predicted_customers}")
-            print(f"Waiters per shift: {manager.waiters_assigned_count}")
+        # Apply manager's schedule if available
+        if hasattr(self.manager, 'waiters_assigned_count') and any(self.manager.waiters_assigned_count.values()):
+            print(f"Applying manager's schedule for day {self.current_day + 1}")
+            print(f"Predicted customers: {self.manager.predicted_customers}")
+            print(f"Waiters per shift: {self.manager.waiters_assigned_count}")
+        else:
+            print(f"No schedule available for day {self.current_day + 1}, using defaults")
+            if not hasattr(self.manager, 'waiters_assigned_count'):
+                self.manager.waiters_assigned_count = {1: 2, 2: 2, 3: 2}  #
 
         # Reset time to opening hour
         self.current_minute = self.opening_hour
@@ -285,6 +287,8 @@ class RestaurantModel(mesa.Model):
         for waiter in self.agents.select(agent_type=WaiterAgent):
             waiter.current_customer = None
             waiter.has_order_to_deliver = False
+            waiter.carrying_food = []  # Clear any carried food
+            waiter.target_pos = None
 
             # Reset position to kitchen
             self.grid.move_agent(waiter, self.kitchen.pos)
@@ -298,44 +302,97 @@ class RestaurantModel(mesa.Model):
         print(f"DEBUG: After reset - current_minute: {self.current_minute}, day: {self.current_day}")
         print(f"DEBUG: Opening hour: {self.opening_hour}, Closing hour: {self.closing_hour}")
 
+        # Create waiters for first shift after reset
+        print(f"Creating waiters for first shift of day {self.current_day}")
+        first_shift = min(self.shifts.keys())
+        self.create_waiters_for_shift(first_shift)
+
     def create_waiters_for_shift(self, shift_id):
         """Create waiters for the specified shift based on manager's schedule"""
         if not self.manager or not hasattr(self.manager, 'schedule'):
             print(f"Warning: No manager or schedule found for shift {shift_id}")
             return
 
-        # Get waiters assigned to this shift
-        waiters_for_shift = self.manager.schedule.get(shift_id, [])
+        # Default min waiters if on day 1 or no schedule exists
+        if self.current_day == 1 and not self.manager.waiters_assigned_count.get(shift_id, 0):
+            waiters_needed = 2  # Minimum default for day 1
+        else:
+            waiters_needed = self.manager.waiters_assigned_count.get(shift_id, 2)
 
-        # Remove any existing waiters for this shift
-        waiters_to_remove = [w for w in self.agents.select(agent_type=WaiterAgent)
-                             if hasattr(w, 'shift') and w.shift == shift_id]
-        for waiter in waiters_to_remove:
-            self.grid.remove_agent(waiter)
-            self.agents.remove(waiter)
+        # Get current waiters
+        current_waiters = list(self.agents.select(agent_type=WaiterAgent))
+        current_count = len(current_waiters)
 
-        # Create new waiters for this shift
-        for i, waiter_id in enumerate(waiters_for_shift):
-            waiter_agent = WaiterAgent(self)
-            waiter_agent.shift = shift_id
-            waiter_agent.unique_id = f"waiter_{shift_id}_{i+1}"
+        print(f"Shift {shift_id}: {waiters_needed} waiters needed, {current_count} currently active")
 
-            # Initialize essential serving attributes
-            waiter_agent.current_customer = None
-            waiter_agent.has_order_to_deliver = False
-            waiter_agent.is_available = True
-            waiter_agent.served_customers = 0
-            waiter_agent.tips = 0
-            waiter_agent.avg_rating = 0
+        # Case 1: Remove excess waiters
+        if current_count > waiters_needed:
+            waiters_to_remove = current_waiters[waiters_needed:]
+            for waiter in waiters_to_remove:
+                self.grid.remove_agent(waiter)
+                self.agents.remove(waiter)
+            print(f"Removed {len(waiters_to_remove)} excess waiters")
 
-            self.agents.add(waiter_agent)
-            self.grid.place_agent(waiter_agent, self.kitchen.pos)
+        # Case 2: Add new waiters
+        elif current_count < waiters_needed:
+            waiters_to_add = waiters_needed - current_count
+            # Find max existing ID to avoid duplicates
+            max_waiter_id = 0
+            for w in current_waiters:
+                if hasattr(w, 'unique_id') and w.unique_id > max_waiter_id:
+                    max_waiter_id = w.unique_id
 
-        # Update the count for tracking
-        if self.manager:
-            self.manager.waiters_assigned_count[shift_id] = len(waiters_for_shift)
+            for i in range(waiters_to_add):
+                waiter_agent = WaiterAgent(self)
+                waiter_agent.shift = shift_id
+                waiter_agent.unique_id = max_waiter_id + i + 1  # Use truly unique IDs
+                waiter_agent.is_available = True
+                waiter_agent.carrying_food = []  # Initialize with empty list
+                waiter_agent.target_pos = None
 
-        print(f"Created {len(waiters_for_shift)} waiters for shift {shift_id}")
+                self.agents.add(waiter_agent)
+                self.grid.place_agent(waiter_agent, self.kitchen.pos)
+            print(f"Added {waiters_to_add} new waiters")
+
+        else:
+            print(f"No change in waiters for shift {shift_id}")
+
+        # Reset all waiters for the new shift
+        for waiter in self.agents.select(agent_type=WaiterAgent):
+            # Update shift assignment
+            waiter.shift = shift_id
+
+        # Debug state of all waiters
+        print(f"DEBUG: Created waiters for shift {shift_id}: {waiters_needed} needed, {current_count} existing")
+        for w in self.agents.select(agent_type=WaiterAgent):
+            print(
+                f"DEBUG: Waiter {w.unique_id} state: "
+                f"available={w.is_available}, "
+                f"carrying_food={len(w.carrying_food) if hasattr(w, 'carrying_food') else 0},"
+                f"target_pos={w.target_pos}"
+            )
+
+    def get_daily_stats(self):
+        """Get daily statistics for debugging and reporting"""
+        # Calculate tips from waiters
+        total_tips = sum(waiter.tips for waiter in self.agents
+                         if hasattr(waiter, 'tips'))
+
+        # Get food revenue (profit minus tips)
+        food_revenue = self.profit - total_tips
+
+        stats = {
+            'day': self.current_day,
+            'food_revenue': food_revenue,
+            'tips': total_tips,
+            'total_revenue': self.profit,
+            'customers_paid': self.customers_paid,
+            'customers_left': self.customers_left_without_paying,
+            'served_customers': sum(waiter.served_customers for waiter in self.agents
+                                    if hasattr(waiter, 'served_customers'))
+        }
+
+        return stats
 
     def step(self):
         """Advance simulation by one time step"""
@@ -360,6 +417,11 @@ class RestaurantModel(mesa.Model):
             print(f"Customers paid: {self.customers_paid}")
             print(f"Customers left without paying: {self.customers_left_without_paying}")
             print(f"Current profit: ${self.profit:.2f}\n")
+
+        print(
+            f"DEBUG: Day {self.current_day}, minute {self.current_minute}: "
+            f"Active customers: {len(self.agents.select(agent_type=CustomerAgent))}, "
+            f"waiters: {len(self.agents.select(agent_type=WaiterAgent))}")
 
         # Process kitchen orders
         self.kitchen.add_ready_orders_to_prepared(self.current_minute)
