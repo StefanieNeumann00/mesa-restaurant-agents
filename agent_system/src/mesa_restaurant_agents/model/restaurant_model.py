@@ -85,21 +85,19 @@ class RestaurantModel(mesa.Model):
         # Set up data collection for model metrics
         self.datacollector = mesa.DataCollector(
             model_reporters={
-                "Customer_Count": lambda m: self.get_customers_count(m.agents),
-                "Average_Wait_Time": lambda m: np.mean(
-                    [c.waiting_time for c in m.agents.select(agent_type=CustomerAgent)]),
-                "Average_Customer_Satisfaction": lambda m: np.mean(
-                    [c.satisfaction for c in m.agents.select(agent_type=CustomerAgent)]),
+                "Customer_Count": lambda m: m.get_customers_count(m.agents),
+                "Average_Wait_Time": lambda m: m.get_average_wait_time(),
+                "Average_Customer_Satisfaction": lambda m: m.get_average_satisfaction(),
                 "Profit": lambda m: m.profit,
-                "Customer_Info": lambda m: self.get_customer_info(m.agents),
-                "Waiter_Info": lambda m: self.get_waiter_info(m.agents),
-                "GridState": self._get_grid_state,
+                "Customer_Info": lambda m: m.get_customer_info(m.agents),
+                "Waiter_Info": lambda m: m.get_waiter_info(m.agents),
+                "GridState": lambda m: m.get_grid_state(),
             }
         )
         # Collect initial state
         self.datacollector.collect(self)
 
-    def _get_grid_state(self):
+    def get_grid_state(self):
         """Return lightweight grid state representation"""
         state = []
         # Add kitchen position
@@ -413,8 +411,8 @@ class RestaurantModel(mesa.Model):
             self.add_new_customers()
 
         if self.current_minute % 60 == 0:  # Print stats every hour
-            print(f"Day {self.current_day}, Hour {(self.current_minute // 60) % 12 or 12}:")
-            print(f"Hour {self.current_minute // 60}:")
+            hour_24_format = self.current_minute // 60
+            print(f"Day {self.current_day}, Hour {hour_24_format}:00:")
             print(f"Customers paid: {self.customers_paid}")
             print(f"Customers left without paying: {self.customers_left_without_paying}")
             print(f"Current profit: ${self.profit:.2f}\n")
