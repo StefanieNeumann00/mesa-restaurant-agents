@@ -280,6 +280,13 @@ class WaiterAgent(mesa.Agent):
 
         return orders_picked
 
+    def _mark_customer_served(self, customer):
+        """Common code for marking a customer as served"""
+        customer.order_status = OrderStatus.SERVED
+        customer.assigned_waiter.append(self)
+        self.served_customers += 1
+        self.model.total_orders_served += 1
+
     def serve_dish(self, target_customer):
         """Serve food to customer, including reassigned """
         # First check if customer is in the right state to receive food
@@ -292,10 +299,7 @@ class WaiterAgent(mesa.Agent):
             if customer == target_customer:
                 # Only serve if customer is still waiting for food
                 if customer is not None and customer.order_status in [OrderStatus.ORDERED, OrderStatus.DELIVERING]:
-                    customer.order_status = OrderStatus.SERVED
-                    customer.assigned_waiter.append(self)
-                    self.served_customers += 1
-                    self.model.total_orders_served += 1
+                    self._mark_customer_served(customer)
 
                     # Get price info for debug output
                     price = food_options.get(order, {}).get("price", 0)
@@ -315,10 +319,7 @@ class WaiterAgent(mesa.Agent):
             if customer is None and order == target_customer.food_preference:
                 # Only serve if customer is still waiting for food
                 if target_customer.order_status in [OrderStatus.ORDERED, OrderStatus.DELIVERING]:
-                    target_customer.order_status = OrderStatus.SERVED
-                    target_customer.assigned_waiter.append(self)
-                    self.served_customers += 1
-                    self.model.total_orders_served += 1
+                    self._mark_customer_served(customer)
 
                     # Get price info for debug output
                     price = food_options.get(order, {}).get("price")
