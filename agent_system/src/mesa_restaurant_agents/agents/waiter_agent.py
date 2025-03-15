@@ -170,10 +170,7 @@ class WaiterAgent(mesa.Agent):
         return abs(pos1[0] - pos2[0]) + abs(pos1[1] - pos2[1])
 
     def step(self):
-        # Debug current state
-        print(f"DEBUG: Waiter {self.unique_id} step - available={self.is_available}, "
-              f"carrying_food={len(self.carrying_food)}, target_pos={self.target_pos}")
-
+        """Main step function for the waiter agent"""
         # Carrying food - focus on delivery
         if len(self.carrying_food) > 0:
             # Already carrying food - prioritize delivery
@@ -193,6 +190,10 @@ class WaiterAgent(mesa.Agent):
                         self.target_pos = target_customer.pos
                         print(
                             f"Waiter {self.unique_id} targeting customer {target_customer.unique_id} for reassignment")
+
+            # Debug current state - moved here after target calculation
+            print(f"DEBUG: Waiter {self.unique_id} step - available={self.is_available}, "
+                  f"carrying_food={len(self.carrying_food)}, target_pos={self.target_pos}")
 
             # If we have a target, move toward it
             if self.target_pos:
@@ -281,6 +282,11 @@ class WaiterAgent(mesa.Agent):
 
     def serve_dish(self, target_customer):
         """Serve food to customer, including reassigned """
+        # First check if customer is in the right state to receive food
+        if target_customer.order_status not in [OrderStatus.ORDERED, OrderStatus.DELIVERING]:
+            print(f"Cannot serve to customer {target_customer.unique_id} with status {target_customer.order_status}")
+            return False
+
         # Try to serve food originally for this customer
         for i, (customer, order) in enumerate(self.carrying_food):
             if customer == target_customer:
@@ -289,6 +295,7 @@ class WaiterAgent(mesa.Agent):
                     customer.order_status = OrderStatus.SERVED
                     customer.assigned_waiter.append(self)
                     self.served_customers += 1
+                    self.model.total_orders_served += 1
 
                     # Get price info for debug output
                     price = food_options.get(order, {}).get("price", 0)
@@ -311,6 +318,7 @@ class WaiterAgent(mesa.Agent):
                     target_customer.order_status = OrderStatus.SERVED
                     target_customer.assigned_waiter.append(self)
                     self.served_customers += 1
+                    self.model.total_orders_served += 1
 
                     # Get price info for debug output
                     price = food_options.get(order, {}).get("price")

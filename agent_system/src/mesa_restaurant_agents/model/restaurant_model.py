@@ -28,6 +28,7 @@ class RestaurantModel(mesa.Model):
         self.customers_left_without_paying = 0
         self.customer_count = 0
         self.daily_customers = []
+        self.total_orders_served = 0
 
         # Time settings
         self.opening_hour = 11 * 60
@@ -238,10 +239,10 @@ class RestaurantModel(mesa.Model):
 
         # Store daily stats before resetting
         self.daily_records.append({
-            'day': self.current_day,
-            'customers_paid': self.customers_paid,
-            'customers_left': self.customers_left_without_paying,
-            'profit': self.profit,
+            'day': stats['day'],
+            'customers_paid': stats['customers_paid'],
+            'customers_left': stats['customers_left'],
+            'profit': stats['total_revenue'],
             'food_revenue': stats['food_revenue'],
             'tips': stats['tips'],
             'served_orders': stats['served_customers'],
@@ -269,6 +270,7 @@ class RestaurantModel(mesa.Model):
         self.customers_paid = 0
         self.customers_left_without_paying = 0
         self.profit = 0
+        self.total_orders_served = 0
 
         # Reset kitchen orders
         self.kitchen.requested_orders.clear()
@@ -388,8 +390,7 @@ class RestaurantModel(mesa.Model):
             'total_revenue': self.profit,
             'customers_paid': self.customers_paid,
             'customers_left': self.customers_left_without_paying,
-            'served_customers': sum(waiter.served_customers for waiter in self.agents
-                                    if hasattr(waiter, 'served_customers'))
+            'served_customers': self.total_orders_served
         }
 
         return stats
