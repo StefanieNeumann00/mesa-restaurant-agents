@@ -1,12 +1,13 @@
 from enum import Enum
 from typing import Dict, List, Set
 
+
 class WaiterDefinition:
     # Shifts definitions
     SHIFTS = [1, 2, 3]
 
     # Waiter capacity
-    CAPACITY_WAITER = 50
+    CAPACITY_WAITER = 20
 
     # Waiter type definitions
     class Type(Enum):
@@ -15,29 +16,36 @@ class WaiterDefinition:
 
     # Waiter names by type
     WAITER_NAMES: Dict[str, List[str]] = {
-        Type.FULLTIME.value: ["Ana", "Bob", "Alice", "Putri", "Lala"],
-        Type.PARTTIME.value: ["Laura", "Bill", "Feni", "Steffi", "Johannes"]
+        Type.FULLTIME.value: ["Ana", "Bob", "Alice", "Putri", "Lala", "Peter", "Karl", "Stefan", "Max",
+                              "Michael", "Sarah", "David", "Emma", "Daniel", "Olivia", "James", "Sophia"
+                              ],
+        Type.PARTTIME.value: ["Laura", "Bill", "Feni", "Steffi", "Johannes",
+                              "Alex", "Nina", "Tomas", "Maria", "Chris", "Ava", "Leo", "Hannah"
+                              ]
     }
 
     # Waiter totals by type
     WAITER_TOTAL: Dict[str, int] = {
-        Type.FULLTIME.value: 5,
-        Type.PARTTIME.value: 5
+        Type.FULLTIME.value: 17,
+        Type.PARTTIME.value: 13
     }
 
     # Define groups for constraint
-    GROUP_A = ["Ana", "Bob", "Alice"]
-    GROUP_B = ["Putri", "Lala", "Laura"]
+    GROUP_A = ["Ana", "Bob", "Alice", "Michael", "Sarah", "David"]
+    GROUP_B = ["Putri", "Lala", "Laura", "Emma", "Alex", "Nina"]
 
     # Waiters per shift preferences
     ELIGIBLE_WAITERS_BY_SHIFT: Dict[int, List[str]] = {
-        1: ["Ana", "Bob", "Putri", "Lala", "Laura", "Bill", "Johannes", "Steffi"],
-        2: ["Ana", "Bob", "Alice", "Putri", "Lala", "Johannes", "Steffi", "Feni"],
-        3: ["Ana", "Bob", "Alice", "Putri", "Lala", "Steffi", "Feni"]
+        1: ["Ana", "Bob", "Putri", "Lala", "Laura", "Bill", "Johannes", "Steffi", "Peter", "Max",
+            "Michael", "Sarah", "Emma", "Alex", "Nina", "Tomas", "Chris", "Leo"],
+        2: ["Ana", "Bob", "Alice", "Putri", "Lala", "Johannes", "Steffi", "Feni", "Karl", "Max",
+            "David", "Olivia", "James", "Maria", "Chris", "Ava", "Hannah", "Daniel"],
+        3: ["Ana", "Bob", "Alice", "Putri", "Lala", "Steffi", "Feni", "Karl",
+            "Michael", "Sarah", "David", "Emma", "Daniel", "Sophia", "Maria", "Ava", "Leo"]
     }
 
     # Minimum waiters per shift
-    MIN_WAITERS_PER_SHIFT = 2
+    MIN_WAITERS_PER_SHIFT = 4
 
     @classmethod
     def get_fulltime_waiters(cls) -> List[str]:
