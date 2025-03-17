@@ -104,6 +104,9 @@ class GridAnimator:
         """Convert lightweight grid state to visualization format"""
         # Initialize grid with FREE value
         grid = np.ones((self.grid_width, self.grid_height)) * EnvironmentDefinition.FREE.value
+        designations = np.ones((self.grid_width, self.grid_height)) * EnvironmentDefinition.FREE.value
+        designations = designations.astype(str)
+
 
         # Handle GridState first (agents and static objects)
         for cell in reversed(step_data['GridState']):
@@ -115,8 +118,10 @@ class GridAnimator:
             cell_type = cell['type']
             if cell_type == 'Table':
                 grid[x][y] = EnvironmentDefinition.FREE_TABLE.value
+                designations[x][y] = str(EnvironmentDefinition.FREE_TABLE.value)
             elif cell_type == 'Kitchen':
                 grid[x][y] = EnvironmentDefinition.KITCHEN.value
+                designations[x][y] = str(EnvironmentDefinition.FREE_TABLE.value)
 
         # Then add agents in a second pass to ensure they're not overwritten
         for cell in step_data['GridState']:
@@ -128,16 +133,20 @@ class GridAnimator:
             cell_type = cell ['type']
             if cell_type== 'CustomerAgent':
                 grid[x][y] = EnvironmentDefinition.CUSTOMER.value
+                designations[x][y] += str(EnvironmentDefinition.FREE_TABLE.value)
             elif cell_type == 'WaiterAgent':
                 grid[x][y] = EnvironmentDefinition.WAITER.value
+                designations[x][y] += str(EnvironmentDefinition.FREE_TABLE.value)
             elif cell_type == 'ManagerAgent':
                 grid[x][y] = EnvironmentDefinition.MANAGER.value
+                designations[x][y] += str(EnvironmentDefinition.FREE_TABLE.value)
 
-        return grid
+        return grid, designations
 
     def visualize_grid(self, step_data):
-        grid = self._create_grid_frame(step_data)
-        annot = np.vectorize(EnvironmentDefinition.get_designations().get)(grid)
+        grid, designations = self._create_grid_frame(step_data)
+        print(designations)
+        annot = np.vectorize(EnvironmentDefinition.get_designations().get)(designations)
         cmap = mcolors.ListedColormap(['#F5F5F5', '#DEB887', '#FFFFFF', '#4169E1', '#FF8C00', '#8B0000'])
         sns.heatmap(grid, ax=self.ax, cmap=cmap, annot=annot, cbar=False, square=True, fmt="")
 
