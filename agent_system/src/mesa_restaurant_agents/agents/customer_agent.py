@@ -14,14 +14,11 @@ class CustomerAgent(mesa.Agent):
         self.satisfaction = 100                       # Overall satisfaction (0-100)
         self.tip = 0                                  # Amount of tip given
         self.assigned_waiter = []                     # Reference to assigned waiter
-        self.dining_duration = random.randint(90, 180)  # Time to spend at restaurant
+        self.dining_duration = random.randint(60, 120)  # Time to spend at restaurant
         self._served_logged = False
 
     def step(self):
         """Update customer state each time step (5 minutes)"""
-        current_time = self.model.current_minute - self.order_minute
-
-        # Track status changes
         if self.order_status == OrderStatus.SERVED and not hasattr(self, '_served_logged'):
             print(f"Customer was served after {self.waiting_time} minutes")
             self._served_logged = True
@@ -31,7 +28,7 @@ class CustomerAgent(mesa.Agent):
             self.waiting_time = self.model.current_minute - self.order_minute
             self.satisfaction = max(0, 100 - (self.waiting_time * 2))  # Decrease by 2 points per minute
             if self.waiting_time >= self.dining_duration:
-                print(f"Customer left unserved after waiting {self.waiting_time} minutes")
+                # print(f"Customer left unserved after waiting {self.waiting_time} minutes")
                 self.leave_without_paying()
 
         # Check if customer should leave after finishing meal
@@ -70,7 +67,7 @@ class CustomerAgent(mesa.Agent):
             self.model.profit = 0  # Ensure profit exists
 
         self.model.profit += total_payment  # Add payment to model's profit
-        print(f"Customer paid: {total_payment}")  # Add debug print
+        # print(f"Customer paid: {total_payment}")  # Add debug print
         return total_payment
 
     def leave_without_paying(self):
@@ -84,20 +81,20 @@ class CustomerAgent(mesa.Agent):
                 if customer == self:
                     # Mark food as available for reassignment
                     waiter.carrying_food[i] = (None, food_type)
-                    print(
-                        f"Waiter {waiter.unique_id} notified: Customer {self.unique_id} left, will reassign their {food_type}")
+                    # print(
+                     #   f"Waiter {waiter.unique_id} notified: Customer {self.unique_id} left, will reassign their {food_type}")
 
         self.satisfaction = 0
         self.tip = 0
         self.model.customers_left_without_paying += 1
-        print(f"Customer left without paying at minute {self.model.current_minute}. Wait time: {self.waiting_time}")
+        # print(f"Customer left without paying at minute {self.model.current_minute}. Wait time: {self.waiting_time}")
         self.model.remove_customer(self)
 
     def leave_restaurant(self):
         """Leave restaurant after dining"""
         payment = self.rate_and_pay()
         self.model.customers_paid += 1
-        print(f"Customer paid ${payment:.2f} at minute {self.model.current_minute}. Wait time: {self.waiting_time}")
+        # print(f"Customer paid ${payment:.2f} at minute {self.model.current_minute}. Wait time: {self.waiting_time}")
 
         # Clean up references in waiters' carrying lists
         waiters = self.model.agents.select(lambda x: hasattr(x, 'carrying_food'))

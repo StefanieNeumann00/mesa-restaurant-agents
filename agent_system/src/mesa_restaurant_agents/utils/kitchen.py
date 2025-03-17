@@ -26,10 +26,6 @@ class Kitchen:
         for customer in to_delete:
             del self.requested_orders[customer]
 
-        # Debug prints
-        # prepared_orders_info = {f"Customer {c.unique_id}": order for c, order in self.prepared_orders.items()}
-        # requested_orders_info = {f"Customer {c.unique_id}":
-        #                             {"order": v["order"], "waiting_since": current_minute - v["order_minute"]}
-        #                         for c, v in self.requested_orders.items()}
-        # print(f"Prepared orders: {prepared_orders_info}")
-        # print(f"Requested orders: {requested_orders_info}")
+        print(
+            f"DEBUG: Kitchen processing - requested orders: "
+            f"{len(self.requested_orders)}, prepared orders: {len(self.prepared_orders)}")
