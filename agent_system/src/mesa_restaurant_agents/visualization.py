@@ -80,22 +80,13 @@ def display_first_run_step_results_waiter(results):
     return waiter_infos_df
 
 
-def visualize_grid(grid, ax):
-    env, annot = grid.visualize()
-    cmap = mcolors.ListedColormap(['#F5F5F5', '#DEB887', '#FFFFFF', '#4169E1', '#FF8C00', '#8B0000'])
-
-    # Create the heatmap
-    sns.heatmap(env, ax=ax, cmap=cmap, annot=annot, cbar=False, square=True, fmt="", )
-    #sns.heatmap(env, ax=ax, cmap="viridis", annot=annot, cbar=False, square=True, fmt="")
-
-
 class GridAnimator:
     def __init__(self, results):
         df = pd.DataFrame(results)
         data_first_run = df[df["RunId"] == 0]
         self.step_data = data_first_run.to_dict('records')
-        self.grid_width = 23  # Set based on your model parameters
-        self.grid_height = 23
+        self.grid_width = results[0]['grid_width']  # Set based on your model parameters
+        self.grid_height = results[0]['grid_height']
         self.count = 0
         self.fig, self.ax = plt.subplots(figsize=(10, 10))
         self.init_ani()
@@ -104,9 +95,7 @@ class GridAnimator:
         """Convert lightweight grid state to visualization format"""
         # Initialize grid with FREE value
         grid = np.ones((self.grid_width, self.grid_height)) * EnvironmentDefinition.FREE.value
-        designations = np.ones((self.grid_width, self.grid_height)) * EnvironmentDefinition.FREE.value
-        designations = designations.astype(str)
-
+        agent_counts = np.zeros((self.grid_width, self.grid_height))
 
         # Handle GridState first (agents and static objects)
         for cell in reversed(step_data['GridState']):
@@ -118,10 +107,8 @@ class GridAnimator:
             cell_type = cell['type']
             if cell_type == 'Table':
                 grid[x][y] = EnvironmentDefinition.FREE_TABLE.value
-                designations[x][y] = str(EnvironmentDefinition.FREE_TABLE.value)
             elif cell_type == 'Kitchen':
                 grid[x][y] = EnvironmentDefinition.KITCHEN.value
-                designations[x][y] = str(EnvironmentDefinition.FREE_TABLE.value)
 
         # Then add agents in a second pass to ensure they're not overwritten
         for cell in step_data['GridState']:
@@ -130,23 +117,28 @@ class GridAnimator:
             if x >= self.grid_width or y >= self.grid_height:
                 continue
 
-            cell_type = cell ['type']
+            cell_type = cell['type']
             if cell_type== 'CustomerAgent':
                 grid[x][y] = EnvironmentDefinition.CUSTOMER.value
-                designations[x][y] += str(EnvironmentDefinition.FREE_TABLE.value)
+                agent_counts[x][y] += 1
             elif cell_type == 'WaiterAgent':
                 grid[x][y] = EnvironmentDefinition.WAITER.value
-                designations[x][y] += str(EnvironmentDefinition.FREE_TABLE.value)
+                agent_counts[x][y] += 1
             elif cell_type == 'ManagerAgent':
                 grid[x][y] = EnvironmentDefinition.MANAGER.value
-                designations[x][y] += str(EnvironmentDefinition.FREE_TABLE.value)
+                agent_counts[x][y] += 1
 
-        return grid, designations
+        return grid, agent_counts
 
     def visualize_grid(self, step_data):
-        grid, designations = self._create_grid_frame(step_data)
-        print(designations)
-        annot = np.vectorize(EnvironmentDefinition.get_designations().get)(designations)
+        grid, agent_counts = self._create_grid_frame(step_data)
+        #annot = np.vectorize(EnvironmentDefinition.get_designations().get)(grid)
+        annot = np.empty_like(grid, dtype=object)
+        for x in range(self.grid_width):
+            for y in range(self.grid_height):
+                annot[x][y] = EnvironmentDefinition.get_designations().get(grid[x][y], "")
+                if agent_counts[x][y] > 0:
+                    annot[x][y] += f"({int(agent_counts[x][y])})"
         cmap = mcolors.ListedColormap(['#F5F5F5', '#DEB887', '#FFFFFF', '#4169E1', '#FF8C00', '#8B0000'])
         sns.heatmap(grid, ax=self.ax, cmap=cmap, annot=annot, cbar=False, square=True, fmt="")
 
