@@ -66,16 +66,21 @@ def display_first_run_step_results_customer(results):
 def display_first_run_step_results_waiter(results):
     df = pd.DataFrame(results)
     data_first_run = df[df["RunId"] == 0]
-    waiter_infos_dict = dict(data_first_run["Waiter_Info"])
-    waiter_infos_list = [{**item, 'step': k} for k, v in waiter_infos_dict.items() for item in v]
+
+    data_first_run['Time'] = data_first_run['Step'].apply(
+        lambda x: pd.Timestamp('2024-01-01 11:00:00') + pd.Timedelta(minutes=x * 5))
+
+    waiter_infos_dict = dict(zip(data_first_run["Time"], data_first_run["Waiter_Info"]))
+    waiter_infos_list = [{**item, 'time': k} for k, v in waiter_infos_dict.items() for item in v]
     waiter_infos_df = pd.DataFrame(waiter_infos_list)
 
-    plots = ['tips', 'avg_rating', 'served_customers']
+    waiter_infos_df
 
+    plots = ['tips', 'avg_rating', 'served_customers']
     for plot in plots:
-        fig = px.histogram(waiter_infos_df, x="step", y=plot,
-                           color='waiter_nr', barmode='group',
-                           height=400, nbins=len(waiter_infos_df['step'].unique()))
+        fig = px.histogram(waiter_infos_df, x="time", y=plot,
+                            color='waiter_nr', barmode='group',
+                            height=400, nbins=len(waiter_infos_df['time'].unique()))
         print(fig.show())
     return waiter_infos_df
 

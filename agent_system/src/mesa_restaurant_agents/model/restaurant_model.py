@@ -12,6 +12,7 @@ class RestaurantModel(mesa.Model):
     def __init__(self, n_waiters, grid_width, grid_height, seed=None):
         super().__init__(seed=seed)
 
+        self.multi_day_mode = True
         self.grid_height = grid_height if grid_height % 2 != 0 else grid_height + 1  # make sure grid_height is uneven
         self.grid_width = grid_width if grid_width % 2 != 0 else grid_width + 1  # make sure grid_width is uneven
         # self.grid = mesa.space.SingleGrid(self.grid_width, self.grid_height, True)
@@ -122,6 +123,7 @@ class RestaurantModel(mesa.Model):
                 state.append({
                     'pos': agent.pos,
                     'type': type(agent).__name__,
+                    'nr': agent.unique_id,
                 })
         # print(f"Final state size: {len(state)}")
         return state

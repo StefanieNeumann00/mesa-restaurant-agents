@@ -73,6 +73,8 @@ class WaiterAgent(mesa.Agent):
             # Calculate urgency scores based on waiting time and distance
         customer_scores = []
         for customer in ready_customers:
+            if not customer:
+                continue
             # Check if we're carrying this customer's specific order
             carrying_for_customer = any(c == customer for c, _ in self.carrying_food)
 
@@ -282,10 +284,11 @@ class WaiterAgent(mesa.Agent):
 
     def _mark_customer_served(self, customer):
         """Common code for marking a customer as served"""
-        customer.order_status = OrderStatus.SERVED
-        customer.assigned_waiter.append(self)
-        self.served_customers += 1
-        self.model.total_orders_served += 1
+        if customer:
+            customer.order_status = OrderStatus.SERVED
+            customer.assigned_waiter.append(self)
+            self.served_customers += 1
+            self.model.total_orders_served += 1
 
     def serve_dish(self, target_customer):
         """Serve food to customer, including reassigned """
