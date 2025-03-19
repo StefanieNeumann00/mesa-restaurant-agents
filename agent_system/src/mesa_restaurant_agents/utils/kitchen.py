@@ -26,6 +26,6 @@ class Kitchen:
         for customer in to_delete:
             del self.requested_orders[customer]
 
-        print(
-            f"DEBUG: Kitchen processing - requested orders: "
-            f"{len(self.requested_orders)}, prepared orders: {len(self.prepared_orders)}")
+        #print(
+        #    f"DEBUG: Kitchen processing - requested orders: "
+        #    f"{len(self.requested_orders)}, prepared orders: {len(self.prepared_orders)}")

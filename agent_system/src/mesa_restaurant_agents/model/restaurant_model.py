@@ -52,8 +52,8 @@ class RestaurantModel(mesa.Model):
         self.shift_customers = {1: 0, 2: 0, 3: 0}
 
         # Debugging
-        print(f"Step {self.current_minute}, Profit: {self.profit}")
-        print(f"Active customers: {len(self.agents.select(agent_type=CustomerAgent))}")
+        #print(f"Step {self.current_minute}, Profit: {self.profit}")
+        #print(f"Active customers: {len(self.agents.select(agent_type=CustomerAgent))}")
 
         # Create waiter agents with assignment of fulltime/part-time
         fulltime_count = max(1, n_waiters // 2)  # At least 1 fulltime waiter
@@ -154,7 +154,6 @@ class RestaurantModel(mesa.Model):
         for waiter in waiters:
             w_info = {"waiter_nr": waiter.unique_id,
                       "tips": waiter.tips,
-                      "avg_rating": waiter.avg_rating,
                       "served_customers": waiter.served_customers}
             w_infos.append(w_info)
         return w_infos
@@ -250,8 +249,8 @@ class RestaurantModel(mesa.Model):
         })
 
         # Before advancing day counter, apply the manager's optimized schedule
-        print(f"DEBUG: Day {self.current_day} completed, resetting for day {self.current_day + 1}")
-        print(f"DEBUG: Before reset - current_minute: {self.current_minute}")
+        #print(f"DEBUG: Day {self.current_day} completed, resetting for day {self.current_day + 1}")
+        #print(f"DEBUG: Before reset - current_minute: {self.current_minute}")
 
         # Apply manager's schedule if available
         if hasattr(self.manager, 'waiters_assigned_count') and any(self.manager.waiters_assigned_count.values()):
@@ -301,8 +300,8 @@ class RestaurantModel(mesa.Model):
         # Reset running flag
         self.running = True
 
-        print(f"DEBUG: After reset - current_minute: {self.current_minute}, day: {self.current_day}")
-        print(f"DEBUG: Opening hour: {self.opening_hour}, Closing hour: {self.closing_hour}")
+        #print(f"DEBUG: After reset - current_minute: {self.current_minute}, day: {self.current_day}")
+        #print(f"DEBUG: Opening hour: {self.opening_hour}, Closing hour: {self.closing_hour}")
 
         # Create waiters for first shift after reset
         print(f"Creating waiters for first shift of day {self.current_day}")
@@ -365,14 +364,14 @@ class RestaurantModel(mesa.Model):
             waiter.shift = shift_id
 
         # Debug state of all waiters
-        print(f"DEBUG: Created waiters for shift {shift_id}: {waiters_needed} needed, {current_count} existing")
-        for w in self.agents.select(agent_type=WaiterAgent):
-            print(
-                f"DEBUG: Waiter {w.unique_id} state: "
-                f"available={w.is_available}, "
-                f"carrying_food={len(w.carrying_food) if hasattr(w, 'carrying_food') else 0},"
-                f"target_pos={w.target_pos}"
-            )
+        #print(f"DEBUG: Created waiters for shift {shift_id}: {waiters_needed} needed, {current_count} existing")
+        #for w in self.agents.select(agent_type=WaiterAgent):
+        #    print(
+        #        f"DEBUG: Waiter {w.unique_id} state: "
+        #        f"available={w.is_available}, "
+        #        f"carrying_food={len(w.carrying_food) if hasattr(w, 'carrying_food') else 0},"
+        #        f"target_pos={w.target_pos}"
+        #    )
 
     def get_daily_stats(self):
         """Get daily statistics for debugging and reporting"""
@@ -419,10 +418,10 @@ class RestaurantModel(mesa.Model):
             print(f"Customers left without paying: {self.customers_left_without_paying}")
             print(f"Current profit: ${self.profit:.2f}\n")
 
-        print(
-            f"DEBUG: Day {self.current_day}, minute {self.current_minute}: "
-            f"Active customers: {len(self.agents.select(agent_type=CustomerAgent))}, "
-            f"waiters: {len(self.agents.select(agent_type=WaiterAgent))}")
+        #print(
+        #    f"DEBUG: Day {self.current_day}, minute {self.current_minute}: "
+        #    f"Active customers: {len(self.agents.select(agent_type=CustomerAgent))}, "
+        #    f"waiters: {len(self.agents.select(agent_type=WaiterAgent))}")
 
         # Process kitchen orders
         self.kitchen.add_ready_orders_to_prepared(self.current_minute)
@@ -447,7 +446,7 @@ class RestaurantModel(mesa.Model):
 
         # Handle day transition ONLY when day actually ends
         if hasattr(self, 'multi_day_mode') and self.multi_day_mode and self.current_minute >= self.closing_hour:
-            print(f"DEBUG: Day {self.current_day} complete, transitioning to day {self.current_day + 1}")
+            #print(f"DEBUG: Day {self.current_day} complete, transitioning to day {self.current_day + 1}")
             self.reset_for_new_day()
             return  # Important: return after reset to avoid multiple resets
 

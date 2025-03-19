@@ -20,7 +20,7 @@ class CustomerAgent(mesa.Agent):
     def step(self):
         """Update customer state each time step (5 minutes)"""
         if self.order_status == OrderStatus.SERVED and not hasattr(self, '_served_logged'):
-            print(f"Customer was served after {self.waiting_time} minutes")
+            #print(f"Customer was served after {self.waiting_time} minutes")
             self._served_logged = True
 
         # Increment waiting time if not served yet
