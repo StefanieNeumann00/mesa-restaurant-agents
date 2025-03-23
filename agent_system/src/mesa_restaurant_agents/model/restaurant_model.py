@@ -399,6 +399,10 @@ class RestaurantModel(mesa.Model):
 
     def step(self):
         """Advance simulation by one time step"""
+        # Update metrics
+        self.customer_count = len(self.agents.select(agent_type=CustomerAgent))
+        self.datacollector.collect(self)
+
         self.current_minute += self.time_step
 
         # Create waiters at the beginning of each shift
@@ -456,6 +460,3 @@ class RestaurantModel(mesa.Model):
         # print(f"Kitchen state: {len(self.kitchen.requested_orders)} requested, "
         #      f"{len(self.kitchen.prepared_orders)} prepared")
 
-        # Update metrics
-        self.customer_count = len(self.agents.select(agent_type=CustomerAgent))
-        self.datacollector.collect(self)
