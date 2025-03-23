@@ -75,12 +75,10 @@ class RestaurantGrid(mesa.space.MultiGrid):
 
     def position_randomly(self, agent):
         if isinstance(agent, CustomerAgent) and self._empties_customers:
-            print(self._empties_customers)
             pos = random.choice(list(self._empties_customers))
             self.place_agent(agent=agent, pos=pos)
             return True
         elif (isinstance(agent, WaiterAgent) or isinstance(agent, ManagerAgent)) and self._empties_workers:
-            print(self._empties_workers)
             pos = random.choice(list(self._empties_workers))
             self.place_agent(agent=agent, pos=pos)
             return True

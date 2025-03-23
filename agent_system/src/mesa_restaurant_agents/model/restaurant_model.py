@@ -39,7 +39,7 @@ class RestaurantModel(mesa.Model):
 
         # Add day tracking
         self.current_day = 1
-        self.daily_records = []  # For storing metrics across days
+        self.daily_record = [{}]  # For storing metrics across days
 
         # Define shifts by time ranges (in minutes)
         self.shifts = {
@@ -86,6 +86,8 @@ class RestaurantModel(mesa.Model):
         # Set up data collection for model metrics
         self.datacollector = mesa.DataCollector(
             model_reporters={
+                "day": lambda m: m.current_day,
+                "time": lambda m: m.current_minute,
                 "Customer_Count": lambda m: m.get_customers_count(m.agents),
                 "Average_Wait_Time": lambda m: m.get_average_wait_time(),
                 "Average_Customer_Satisfaction": lambda m: m.get_average_satisfaction(),
@@ -93,6 +95,7 @@ class RestaurantModel(mesa.Model):
                 "Customer_Info": lambda m: m.get_customer_info(m.agents),
                 "Waiter_Info": lambda m: m.get_waiter_info(m.agents),
                 "GridState": lambda m: m.get_grid_state(),
+                "Daily_Stats": lambda m: m.daily_record,
             }
         )
         # Collect initial state
@@ -237,7 +240,7 @@ class RestaurantModel(mesa.Model):
         print(f"===================================")
 
         # Store daily stats before resetting
-        self.daily_records.append({
+        self.daily_record[0] = {
             'day': stats['day'],
             'customers_paid': stats['customers_paid'],
             'customers_left': stats['customers_left'],
@@ -246,7 +249,8 @@ class RestaurantModel(mesa.Model):
             'tips': stats['tips'],
             'served_orders': stats['served_customers'],
             'avg_satisfaction': self.get_average_satisfaction()
-        })
+        }
+
 
         # Before advancing day counter, apply the manager's optimized schedule
         #print(f"DEBUG: Day {self.current_day} completed, resetting for day {self.current_day + 1}")
