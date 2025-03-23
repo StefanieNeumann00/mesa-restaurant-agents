@@ -9,19 +9,13 @@ class WaiterAgent(mesa.Agent):
     def __init__(self, model):
         super().__init__(model)
         # Initialize waiter properties
-        self.model = model  # Current serving status
         self.carrying_food = []  # List of orders currently being carried
         self.max_carry = 4  # Maximum number of food items that can be carried
         self.tips = 0  # Total tips received
-        self.ratings_count = 0  # Number of ratings received
         self.served_customers = 0  # Total customers served
         self.target_pos = None  # Target position to move towards
-        self.current_pos = None  # Current position of the waiter
         self.previous_pos = None  # Previous position to avoid oscillation
         self.is_available = True
-        self.assigned_shifts = []
-        self.consecutive_days_worked = 0
-        self.is_fulltime = True  # Default to fulltime
 
     def __str__(self):
         if hasattr(self, 'display_name'):
@@ -29,82 +23,9 @@ class WaiterAgent(mesa.Agent):
         else:
             return f"Waiter {self.unique_id}"
 
-    def reset_availability(self):
-        """Reset availability based on consecutive days worked"""
-        if self.is_fulltime:
-            if self.consecutive_days_worked >= 4:
-                self.is_available = False
-                self.consecutive_days_worked = 0
-            else:
-                self.is_available = True
-        else:  # Part-time
-            if self.consecutive_days_worked >= 2:
-                self.is_available = False
-                self.consecutive_days_worked = 0
-            else:
-                self.is_available = True
-
-        # Clear shift assignments when resetting availability
-        self.assigned_shifts = []
-
     def can_pick_up_food(self, customer=None, order=None):
         """Check if the waiter can pick up more food and if the order is valid"""
         return len(self.carrying_food) < self.max_carry
-
-    def is_ordered(self, agent):
-        return (hasattr(agent, "order_status") and
-                agent.order_status == OrderStatus.ORDERED)
-
-    def get_best_customer(self):
-        """Find the best customer to serve based on food being carried."""
-        #print(f"Waiter {self.unique_id} looking for best customer:")
-
-        ready_customers = [c for c in self.model.agents.select(agent_type=CustomerAgent)
-                           if hasattr(c, "order_status") and
-                           c.order_status in [OrderStatus.ORDERED, OrderStatus.DELIVERING] and
-                           c.pos is not None and
-                           not c.assigned_waiter]
-
-        if not ready_customers:
-            #print("No ready customers found")
-            return None
-
-            # Calculate urgency scores based on waiting time and distance
-        customer_scores = []
-        for customer in ready_customers:
-            if not customer:
-                continue
-            # Check if we're carrying this customer's specific order
-            carrying_for_customer = any(c == customer for c, _ in self.carrying_food)
-
-            # Check if we have reassignable food matching this customer's preference
-            has_matching_food = any(c is None and o == customer.food_preference
-                                    for c, o in self.carrying_food)
-
-            # Calculate base score from waiting time
-            waiting_score = customer.waiting_time / 3  # Cap at 10
-
-            # Calculate distance penalty
-            distance = self.manhattan_distance(self.pos, customer.pos)
-            distance_penalty = distance / 15  # Cap at 5
-
-            # Calculate final score with priorities
-            score = waiting_score - distance_penalty
-            if carrying_for_customer:
-                score += 20  # High priority for customers we're carrying for
-            elif has_matching_food:
-                score += 15  # Medium priority for matching food preferences
-
-            customer_scores.append((customer, score))
-
-        # Select customer with highest score
-        if customer_scores:
-            customer_scores.sort(key=lambda x: x[1], reverse=True)
-            best_customer = customer_scores[0][0]
-            best_customer.assigned_waiter = [self]
-            return best_customer
-
-        return None
 
     def move(self, steps=12):
         """Move towards the target position using A* pathfinding"""
@@ -233,24 +154,41 @@ class WaiterAgent(mesa.Agent):
 
     def find_best_customer_for_existing_food(self):
         """Find the best customer to serve with food we're already carrying"""
+        ready_customers = [c for c in self.model.agents.select(agent_type=CustomerAgent)
+                           if c.order_status in [OrderStatus.ORDERED, OrderStatus.DELIVERING]
+                           and not c.assigned_waiter]
+
+        if not ready_customers:
+            return None
+
         best_customer = None
         best_score = float('-inf')
 
-        for customer in self.model.agents.select(agent_type=CustomerAgent):
-            if customer.order_status in [OrderStatus.ORDERED, OrderStatus.DELIVERING]:
-                # For reassignable food (where customer=None), check if we have matching food type
-                for carried_customer, order in self.carrying_food:
-                    if carried_customer is None and order == customer.food_preference:
-                        # Use manhattan_distance instead of get_distance
-                        distance = self.manhattan_distance(self.pos, customer.pos)
-                        waiting_score = customer.waiting_time * 2
-                        score = waiting_score - distance
+        customer_scores = []
+        for customer in ready_customers:
+            # Only look for matches with reassignable food we're carrying
+            matching_food = False
+            for carried_customer, order in self.carrying_food:
+                if carried_customer is None and order == customer.food_preference:
+                    matching_food = True
+                    break
 
-                        if score > best_score:
-                            best_score = score
-                            best_customer = customer
+            if matching_food:
+                # Apply scoring from get_best_customer
+                waiting_score = customer.waiting_time / 3
+                distance = self.manhattan_distance(self.pos, customer.pos)
+                distance_penalty = distance / 15
+                score = waiting_score - distance_penalty
 
-        return best_customer
+                customer_scores.append((customer, score))
+
+        if customer_scores:
+            customer_scores.sort(key=lambda x: x[1], reverse=True)
+            best_customer = customer_scores[0][0]
+            best_customer.assigned_waiter = [self]
+            return best_customer
+
+        return None
 
     def pick_up_prepared_orders(self):
         """Track kitchen order pickup"""
