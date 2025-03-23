@@ -251,7 +251,6 @@ class RestaurantModel(mesa.Model):
             'avg_satisfaction': self.get_average_satisfaction()
         }
 
-
         # Before advancing day counter, apply the manager's optimized schedule
         #print(f"DEBUG: Day {self.current_day} completed, resetting for day {self.current_day + 1}")
         #print(f"DEBUG: Before reset - current_minute: {self.current_minute}")
