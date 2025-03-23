@@ -5,54 +5,107 @@ import plotly.express as px
 import seaborn as sns
 import matplotlib.colors as mcolors
 import numpy as np
+import datetime
 from .utils.environment_definition import EnvironmentDefinition
+
+
+def minutes_to_time(row):
+        hours = row['time'] // 60
+        minutes = row['time'] % 60
+        return f"{hours:02d}:{minutes:02d}"
 
 
 def display_mean_step_results(results):
     df = pd.DataFrame(results)
+    df = df[df["RunId"] == 0]
+    df['hours'] = df.apply(minutes_to_time, axis=1)
 
-    # Convert steps to time of day
-    df['Time'] = df['Step'].apply(lambda x: pd.Timestamp('2024-01-01 11:00:00') + pd.Timedelta(minutes=x * 5))
-
-    data_grouped = df.groupby(['Time']).agg(
+    data_grouped = df.groupby(['day','hours']).agg(
         mean_customer_count=('Customer_Count', 'mean'),
+        mean_waiters_count=('Waiters_Count', 'mean'),
         mean_waiting_time=('Average_Wait_Time', 'mean'),
         mean_customer_satisfaction=('Average_Customer_Satisfaction', 'mean'),
         mean_profit=('Profit', 'mean')).reset_index()
 
-    # Plotting the data in one plot
-    fig, ax1 = plt.subplots(figsize=(15, 10))
+    data_grouped['day_hour'] = data_grouped['day'].astype(str) + " " + data_grouped['hours']
+    data_grouped['mean_profit_gradient'] = data_grouped['mean_profit'].diff()
+    data_grouped.loc[data_grouped['mean_profit_gradient'] < -1000, 'mean_profit_gradient'] = None
 
-    ax1.plot(data_grouped['Time'], data_grouped['mean_customer_count'], marker='o', label='Customer Count')
-    ax1.plot(data_grouped['Time'], data_grouped['mean_waiting_time'], marker='o', label='Average Wait Time')
-    ax1.plot(data_grouped['Time'], data_grouped['mean_customer_satisfaction'], marker='o',
-             label='Average Customer Satisfaction')
-    ax1.plot(data_grouped['Time'], data_grouped['mean_profit'], marker='o', label='Profit')
+    custom_colors = {
+        'mean_customer_count': 'blue',
+        'mean_waiting_time': 'red',
+        'mean_customer_satisfaction': 'green',
+        'mean_profit': 'purple',
+        'mean_waiters_count': 'orange',
+        'mean_profit_gradient': 'purple',
+    }
 
-    ax1.set_title('Model Output Data over Steps')
-    ax1.set_xlabel('Time of Day')
-    ax1.set_ylabel('Values')
-    ax1.legend()
+    fig = px.line(data_grouped,
+                x='day_hour',
+                y=['mean_profit'],
+                labels={
+                    "value": "profit",
+                    "day_hour": "time of day"
+                },
+                title="Profit",
+                color_discrete_map={'mean_profit': custom_colors['mean_profit']})
 
-    plt.xticks(rotation=45)
-    plt.tight_layout()  # Adjust layout to prevent label cutoff
-    plt.show()
+    for day in data_grouped['day'].unique():
+        fig.add_vline(x=f"{day} 23:00", line_dash="dash", line_color="black")
+
+    fig.update_layout(showlegend=False)
+    fig.show()
+
+    fig = px.line(data_grouped,
+                x='day_hour',
+                y=['mean_customer_count', 'mean_waiters_count', 'mean_profit_gradient'],
+                labels={
+                    "value": "Customer and Waiter Count to Profit Gradient",
+                    "day_hour": "time of day"
+                },
+                title="Customer and Waiter Count to Profit Gradient",
+                color_discrete_map={'mean_customer_count': custom_colors['mean_customer_count'],
+                                    'mean_waiters_count': custom_colors['mean_waiters_count'],
+                                    'mean_profit_gradient': custom_colors['mean_profit_gradient']})
+
+    for day in data_grouped['day'].unique():
+        fig.add_vline(x=f"{day} 23:00", line_dash="dash", line_color="black")
+
+    fig.update_layout(showlegend=False)
+    fig.show()
+
+    fig = px.line(data_grouped,
+                x='day_hour',
+                y=['mean_waiting_time', 'mean_customer_satisfaction'],
+                labels={
+                    "value": 'Customer Waiting Time and Satisfaction',
+                    "day_hour": "time of day"
+                },
+                title="Customer Waiting Time and Satisfaction",
+                color_discrete_map={'mean_waiting_time': custom_colors['mean_waiting_time'],
+                                    'mean_customer_satisfaction': custom_colors['mean_customer_satisfaction']})
+
+    for day in data_grouped['day'].unique():
+        fig.add_vline(x=f"{day} 15:00", line_dash="dash", line_color="black")
+        fig.add_vline(x=f"{day} 19:00", line_dash="dash", line_color="black")
+        fig.add_vline(x=f"{day} 23:00", line_dash="dash", line_color="black")
+
+    fig.update_layout(showlegend=False)
+    fig.show()
     return data_grouped
 
 
 def display_first_run_step_results_customer(results):
     df = pd.DataFrame(results)
     data_first_run = df[df["RunId"] == 0]
+    data_first_run['hours'] = data_first_run.apply(minutes_to_time, axis=1)
+    data_first_run['day_hour'] = data_first_run['day'].astype(str) + " " + data_first_run['hours']
 
-    # Convert steps to time
-    data_first_run['Time'] = data_first_run['Step'].apply(
-        lambda x: pd.Timestamp('2024-01-01 11:00:00') + pd.Timedelta(minutes=x * 5))
-
-    customer_infos_dict = dict(zip(data_first_run["Time"], data_first_run["Customer_Info"]))
+    customer_infos_dict = dict(zip(data_first_run["day_hour"], data_first_run["Customer_Info"]))
     customer_infos_list = [{**item, 'time': k} for k, v in customer_infos_dict.items() for item in v]
     customer_infos_df = pd.DataFrame(customer_infos_list)
 
-    plots = ['waiting_time', 'order_status', 'satisfaction']
+    plots = ['waiting_time', 'satisfaction']
 
     for plot in plots:
         fig = px.histogram(customer_infos_df, x="time", y=plot,
@@ -66,15 +119,46 @@ def display_first_run_step_results_customer(results):
 def display_first_run_step_results_waiter(results):
     df = pd.DataFrame(results)
     data_first_run = df[df["RunId"] == 0]
+    data_first_run['hours'] = data_first_run.apply(minutes_to_time, axis=1)
+    data_first_run['day_hour'] = data_first_run['day'].astype(str) + " " + data_first_run['hours']
 
-    data_first_run['Time'] = data_first_run['Step'].apply(
-        lambda x: pd.Timestamp('2024-01-01 11:00:00') + pd.Timedelta(minutes=x * 5))
+    waiter_infos_dict = dict(zip(data_first_run['day_hour'], data_first_run['Waiter_Info']))
 
-    waiter_infos_dict = dict(zip(data_first_run["Time"], data_first_run["Waiter_Info"]))
-    waiter_infos_list = [{**item, 'time': k} for k, v in waiter_infos_dict.items() for item in v]
+    waiter_infos_list = [{**item, 'time': k, 'day': k.split()[0], 'hours': k.split()[1]} for k, v in waiter_infos_dict.items() for item in v]
     waiter_infos_df = pd.DataFrame(waiter_infos_list)
 
-    waiter_infos_df
+    waiter_infos_df['hours'] = pd.to_datetime(waiter_infos_df['hours'], format='%H:%M').dt.time
+
+    reset_times = ['11:00', '15:00', '19:00', '23:00']
+    reset_times = [pd.to_datetime(time, format='%H:%M').time() for time in reset_times]
+
+    def reset_tips_served_customers(df):
+        for counter in range(len(reset_times)):
+            
+            if counter == 0:
+                continue
+
+            for day in df['day'].unique():
+                day_rows = df[df['day'] == day]
+                before_reset = day_rows[(day_rows['hours'] < reset_times[counter]) & (day_rows['hours'] >= reset_times[counter-1])]
+
+                if (counter == (len(reset_times)-1)) and ((int(day)+1) in df['day'].unique()):
+                    next_day = str(int(day) + 1)
+                    day_rows = df[df['day'] == next_day]
+                    after_reset = day_rows[(day_rows['hours'] >= reset_times[0]) & (day_rows['hours'] < reset_times[1])]
+                else:
+                    after_reset = day_rows[(day_rows['hours'] >= reset_times[counter]) & (day_rows['hours'] < reset_times[counter+1] if counter+1 < len(reset_times) else True)]            
+                
+                for waiter in df['waiter_nr'].unique():
+                    waiter_before_reset = before_reset[before_reset['waiter_nr'] == waiter]
+                    waiter_after_reset = after_reset[after_reset['waiter_nr'] == waiter]
+                    
+                    if not waiter_before_reset.empty and not waiter_after_reset.empty:
+                        df.loc[waiter_after_reset.index, 'tips'] -= waiter_before_reset['tips'].max()
+                        df.loc[waiter_after_reset.index, 'served_customers'] -= waiter_before_reset['served_customers'].max()
+        return df
+
+    waiter_infos_df = reset_tips_served_customers(waiter_infos_df)
 
     plots = ['tips', 'served_customers']
     for plot in plots:
@@ -137,6 +221,13 @@ class GridAnimator:
 
         return grid, agent_counts, waiter_nrs
 
+    def minutes_to_time(self, minutes):
+        hours = minutes // 60
+        remaining_minutes = minutes % 60
+        
+        time = datetime.time(hour=hours, minute=remaining_minutes)
+        return time
+
     def visualize_grid(self, step_data):
         grid, agent_counts, waiter_nrs = self._create_grid_frame(step_data)
         #annot = np.vectorize(EnvironmentDefinition.get_designations().get)(grid)
@@ -150,6 +241,12 @@ class GridAnimator:
                     annot[x][y] += f"{int(waiter_nrs[x][y])}"
         cmap = mcolors.ListedColormap(['#F5F5F5', '#DEB887', '#FFFFFF', '#4169E1', '#FF8C00', '#8B0000'])
         sns.heatmap(grid, ax=self.ax, cmap=cmap, annot=annot, cbar=False, square=True, fmt="")
+
+        day = step_data['day']
+        time = self.minutes_to_time(step_data['time'])
+        shift = step_data['shift']
+        
+        self.ax.text(0.5, 1.05, f"Day {day}: {time}, Shift {shift}", transform=self.ax.transAxes, fontsize=12, ha='center', va='bottom')
 
     def init_ani(self):
         self.ax.clear()

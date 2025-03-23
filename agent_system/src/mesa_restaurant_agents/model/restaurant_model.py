@@ -87,8 +87,10 @@ class RestaurantModel(mesa.Model):
         self.datacollector = mesa.DataCollector(
             model_reporters={
                 "day": lambda m: m.current_day,
+                "shift": lambda m: m.get_current_shift(),
                 "time": lambda m: m.current_minute,
                 "Customer_Count": lambda m: m.get_customers_count(m.agents),
+                "Waiters_Count": lambda m: m.get_waiters_count(m.agents),
                 "Average_Wait_Time": lambda m: m.get_average_wait_time(),
                 "Average_Customer_Satisfaction": lambda m: m.get_average_satisfaction(),
                 "Profit": lambda m: m.profit,
@@ -163,6 +165,9 @@ class RestaurantModel(mesa.Model):
 
     def get_customers_count(self, agents):
         return len(agents.select(agent_type=CustomerAgent))
+    
+    def get_waiters_count(self, agents):
+        return len(agents.select(agent_type=WaiterAgent))
 
     def is_peak_hour(self):
         """Check if current time is during peak hours"""
@@ -176,15 +181,19 @@ class RestaurantModel(mesa.Model):
             base_rate = 4  # Increased arrival rate during peak hours
         return np.random.poisson(base_rate)  # Random variation in arrivals
 
-    def add_new_customers(self):
-        n_new = self.calculate_new_customers()
-
-        # Determine current shift
+    def get_current_shift(self):
         current_shift = None
         for shift_id, shift_info in self.shifts.items():
             if shift_info["start"] <= self.current_minute < shift_info["end"]:
                 current_shift = shift_id
                 break
+        return current_shift
+
+    def add_new_customers(self):
+        n_new = self.calculate_new_customers()
+
+        # Determine current shift
+        current_shift = self.get_current_shift()
 
         for _ in range(n_new):
             customer = CustomerAgent(model=self)
@@ -381,6 +390,8 @@ class RestaurantModel(mesa.Model):
         # Calculate tips from waiters
         total_tips = sum(waiter.tips for waiter in self.agents
                          if hasattr(waiter, 'tips'))
+        
+
 
         # Get food revenue (profit minus tips)
         food_revenue = self.profit - total_tips
@@ -447,6 +458,8 @@ class RestaurantModel(mesa.Model):
                 if not (self.multi_day_mode and self.current_minute >= self.closing_hour):
                     manager.step()  # Run manager's end of day processing
 
+        self.datacollector.collect(self)
+        
         # Handle day transition ONLY when day actually ends
         if hasattr(self, 'multi_day_mode') and self.multi_day_mode and self.current_minute >= self.closing_hour:
             #print(f"DEBUG: Day {self.current_day} complete, transitioning to day {self.current_day + 1}")
@@ -458,4 +471,3 @@ class RestaurantModel(mesa.Model):
 
         # Update metrics
         self.customer_count = len(self.agents.select(agent_type=CustomerAgent))
-        self.datacollector.collect(self)
