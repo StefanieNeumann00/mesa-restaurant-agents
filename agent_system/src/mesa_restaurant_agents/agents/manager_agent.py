@@ -123,7 +123,10 @@ class ManagerAgent(mesa.Agent):
             shift: len(waiters) for shift, waiters in self.schedule.items()
         }
 
-        #print(f"Optimized schedule for today: {self.waiters_assigned_count} waiters per shift")
+        # Print the schedule information
+        print(f"Optimized schedule for today:")
+        for shift, waiters in self.schedule.items():
+            print(f"Shift {shift}: {', '.join(waiters)} ({len(waiters)} waiters)")
 
     # def order_food(self, food_type, amount):
     #     # Replenish food inventory
