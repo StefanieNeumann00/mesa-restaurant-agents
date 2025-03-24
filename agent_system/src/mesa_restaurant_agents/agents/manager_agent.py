@@ -124,7 +124,7 @@ class ManagerAgent(mesa.Agent):
         }
 
         # Print the schedule information
-        print(f"Optimized schedule for today:")
+        print(f"Optimized schedule for day {self.model.current_day}:")
         for shift, waiters in self.schedule.items():
             print(f"Shift {shift}: {', '.join(waiters)} ({len(waiters)} waiters)")
 
