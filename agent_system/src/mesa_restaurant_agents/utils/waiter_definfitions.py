@@ -45,7 +45,7 @@ class WaiterDefinition:
     }
 
     # Minimum waiters per shift
-    MIN_WAITERS_PER_SHIFT = 4
+    MIN_WAITERS_PER_SHIFT = 2
 
     @classmethod
     def get_fulltime_waiters(cls) -> List[str]:
