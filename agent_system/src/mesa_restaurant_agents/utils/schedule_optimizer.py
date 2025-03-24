@@ -69,8 +69,8 @@ class ScheduleOptimizer:
         default_prediction = {1: 30, 2: 50, 3: 40}
 
         try:
-            customer_data = np.array([[1], [2], [3]])
-            predictions = self.rf_model.predict(customer_data)
+            X_pred = pd.DataFrame({'Shift': shifts})
+            predictions = self.rf_model.predict(X_pred)
 
             # Create prediction dictionary from model outputs
             predicted_demand = {shift: max(20, round(predictions[i - 1]))
