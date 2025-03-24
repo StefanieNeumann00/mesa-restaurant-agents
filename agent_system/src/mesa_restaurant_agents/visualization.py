@@ -51,7 +51,12 @@ def display_mean_step_results(results):
                 color_discrete_map={'mean_profit': custom_colors['mean_profit']})
 
     for day in data_grouped['day'].unique():
-        fig.add_vline(x=f"{day} 23:00", line_dash="dash", line_color="black")
+        if f"{day} 15:00" in data_grouped['day_hour'].values:
+            fig.add_vline(x=f"{day} 15:00", line_dash="dash", line_color="grey")
+        if f"{day} 19:00" in data_grouped['day_hour'].values:
+            fig.add_vline(x=f"{day} 19:00", line_dash="dash", line_color="grey")
+        if f"{day} 23:00" in data_grouped['day_hour'].values:
+            fig.add_vline(x=f"{day} 23:00", line_dash="dash", line_color="black")
 
     fig.update_layout(showlegend=False)
     fig.show()
@@ -69,7 +74,12 @@ def display_mean_step_results(results):
                                     'mean_profit_gradient': custom_colors['mean_profit_gradient']})
 
     for day in data_grouped['day'].unique():
-        fig.add_vline(x=f"{day} 23:00", line_dash="dash", line_color="black")
+        if f"{day} 15:00" in data_grouped['day_hour'].values:
+            fig.add_vline(x=f"{day} 15:00", line_dash="dash", line_color="grey")
+        if f"{day} 19:00" in data_grouped['day_hour'].values:
+            fig.add_vline(x=f"{day} 19:00", line_dash="dash", line_color="grey")
+        if f"{day} 23:00" in data_grouped['day_hour'].values:
+            fig.add_vline(x=f"{day} 23:00", line_dash="dash", line_color="black")
 
     fig.update_layout(showlegend=False)
     fig.show()
@@ -86,9 +96,12 @@ def display_mean_step_results(results):
                                     'mean_customer_satisfaction': custom_colors['mean_customer_satisfaction']})
 
     for day in data_grouped['day'].unique():
-        fig.add_vline(x=f"{day} 15:00", line_dash="dash", line_color="black")
-        fig.add_vline(x=f"{day} 19:00", line_dash="dash", line_color="black")
-        fig.add_vline(x=f"{day} 23:00", line_dash="dash", line_color="black")
+        if f"{day} 15:00" in data_grouped['day_hour'].values:
+            fig.add_vline(x=f"{day} 15:00", line_dash="dash", line_color="grey")
+        if f"{day} 19:00" in data_grouped['day_hour'].values:
+            fig.add_vline(x=f"{day} 19:00", line_dash="dash", line_color="grey")
+        if f"{day} 23:00" in data_grouped['day_hour'].values:
+            fig.add_vline(x=f"{day} 23:00", line_dash="dash", line_color="black")
 
     fig.update_layout(showlegend=False)
     fig.show()
@@ -142,10 +155,10 @@ def display_first_run_step_results_waiter(results):
                 day_rows = df[df['day'] == day]
                 before_reset = day_rows[(day_rows['hours'] < reset_times[counter]) & (day_rows['hours'] >= reset_times[counter-1])]
 
-                if (counter == (len(reset_times)-1)) and ((int(day)+1) in df['day'].unique()):
+                if (counter == (len(reset_times)-1)) and (str((int(day)+1)) in df['day'].unique()):
                     next_day = str(int(day) + 1)
-                    day_rows = df[df['day'] == next_day]
-                    after_reset = day_rows[(day_rows['hours'] >= reset_times[0]) & (day_rows['hours'] < reset_times[1])]
+                    day_rows = df[(df['day'] == next_day) | (df['time'] == day + " 23:00")]
+                    after_reset = day_rows[((day_rows['hours'] >= reset_times[0]) & (day_rows['hours'] < reset_times[1])) | (day_rows['time'] == day + " 23:00")]
                 else:
                     after_reset = day_rows[(day_rows['hours'] >= reset_times[counter]) & (day_rows['hours'] < reset_times[counter+1] if counter+1 < len(reset_times) else True)]            
                 
@@ -265,6 +278,7 @@ class GridAnimator:
             self.animate,
             init_func=self.init_ani,
             frames=len(self.step_data) - 1,
+            interval=25,
             repeat=False
         )
         return ani
