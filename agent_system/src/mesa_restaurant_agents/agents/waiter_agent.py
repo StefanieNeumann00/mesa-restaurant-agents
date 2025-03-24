@@ -27,7 +27,7 @@ class WaiterAgent(mesa.Agent):
         """Check if the waiter can pick up more food and if the order is valid"""
         return len(self.carrying_food) < self.max_carry
 
-    def move(self, steps=12):
+    def move(self, steps=6):
         """Move towards the target position using A* pathfinding"""
         if not self.target_pos or self.pos == self.target_pos:
             return
