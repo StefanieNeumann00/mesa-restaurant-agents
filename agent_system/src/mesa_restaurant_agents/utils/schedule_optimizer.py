@@ -170,7 +170,7 @@ class ScheduleOptimizer:
         Description:
         This function creates and solves an optimization model to assign waiters to shifts while satisfying
         several constraints. The constraints include:
-        1. Each full-time waiter can work at most 2 shifts per day (or 3 if constraints are relaxed).
+        1. Each full-time waiter can work at most 2 shifts per day.
         2. Each part-time waiter can work at most 1 shift per day (or 2 if constraints are relaxed).
         3. The total capacity in each shift must meet or exceed customer demands.
         4. Each shift must have at least 2 waiters.
