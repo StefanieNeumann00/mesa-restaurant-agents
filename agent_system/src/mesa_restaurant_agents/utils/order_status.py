@@ -10,7 +10,7 @@ food_options = {
 
 # Enum to track the status of customer orders
 class OrderStatus(Enum):
-    WAITING = 0    # Customer hasn't ordered yet
+    # WAITING = 0    # Customer hasn't ordered yet
     ORDERED = 1    # Order has been placed
     DELIVERING = 2  # Food is being delivered
     SERVED = 3     # Food has been delivered

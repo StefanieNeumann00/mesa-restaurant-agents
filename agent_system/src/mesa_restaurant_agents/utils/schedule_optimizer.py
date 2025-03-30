@@ -20,7 +20,7 @@ class ScheduleOptimizer:
         self.shifts = WaiterDefinition.SHIFTS
         self.capacity_waiter = WaiterDefinition.CAPACITY_WAITER
         self.waiter_name = WaiterDefinition.WAITER_NAMES
-        self.waiter_total = WaiterDefinition.WAITER_TOTAL
+        # self.waiter_total = WaiterDefinition.WAITER_TOTAL
         self.group_A = WaiterDefinition.GROUP_A
         self.group_B = WaiterDefinition.GROUP_B
         self.eligible_waiters_by_shift = WaiterDefinition.ELIGIBLE_WAITERS_BY_SHIFT
@@ -118,29 +118,29 @@ class ScheduleOptimizer:
         # Retrain the model with updated data
         self._train_model()
 
-    def create_waiter_schedule(self, waiters, predicted_demand, relax_constraints=False):
-        """Create optimal schedule using linear programming"""
-        # Get availability information
-        waiter_availability = {w.unique_id: w.is_available for w in waiters}
-        waiter_vars = {}
-
-        # Convert waiters to proper format for solver
-        fulltime_waiters = [w.unique_id for w in waiters if hasattr(w, 'is_fulltime') and w.is_fulltime]
-        parttime_waiters = [w.unique_id for w in waiters if hasattr(w, 'is_fulltime') and not w.is_fulltime]
-
-        # Try solving with strict constraints first
-        model = self.solve_scheduling_problem(waiter_vars, waiter_availability,
-                                              predicted_demand, fulltime_waiters,
-                                              parttime_waiters, relax_constraints=relax_constraints)
-
-        # Extract schedule from model solution
-        schedule = {shift: [] for shift in [1, 2, 3]}
-        for var_name, var in waiter_vars.items():
-            if model.get_value(var) > 0.5:
-                waiter_id, shift = var_name.rsplit('_', 1)
-                schedule[int(shift)].append(next(w for w in waiters if str(w.unique_id) == waiter_id))
-
-        return schedule, {shift: len(waiters) for shift, waiters in schedule.items()}
+    # def create_waiter_schedule(self, waiters, predicted_demand, relax_constraints=False):
+    #    """Create optimal schedule using linear programming"""
+    #    # Get availability information
+    #    waiter_availability = {w.unique_id: w.is_available for w in waiters}
+    #    waiter_vars = {}
+    #
+    #    # Convert waiters to proper format for solver
+    #    fulltime_waiters = [w.unique_id for w in waiters if hasattr(w, 'is_fulltime') and w.is_fulltime]
+    #    parttime_waiters = [w.unique_id for w in waiters if hasattr(w, 'is_fulltime') and not w.is_fulltime]
+    #
+    #    # Try solving with strict constraints first
+    #    model = self.solve_scheduling_problem(waiter_vars, waiter_availability,
+    #                                          predicted_demand, fulltime_waiters,
+    #                                          parttime_waiters, relax_constraints=relax_constraints)
+    #
+    #    # Extract schedule from model solution
+    #    schedule = {shift: [] for shift in [1, 2, 3]}
+    #    for var_name, var in waiter_vars.items():
+    #        if model.get_value(var) > 0.5:
+    #            waiter_id, shift = var_name.rsplit('_', 1)
+    #            schedule[int(shift)].append(next(w for w in waiters if str(w.unique_id) == waiter_id))
+    #
+    #    return schedule, {shift: len(waiters) for shift, waiters in schedule.items()}
 
     def process_actual_data(self, actual_customer_counts):
         # Update training data with actual counts

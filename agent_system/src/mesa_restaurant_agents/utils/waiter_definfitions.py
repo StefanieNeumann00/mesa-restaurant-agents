@@ -1,5 +1,5 @@
 from enum import Enum
-from typing import Dict, List, Set
+from typing import Dict, List
 
 
 class WaiterDefinition:
@@ -25,10 +25,10 @@ class WaiterDefinition:
     }
 
     # Waiter totals by type
-    WAITER_TOTAL: Dict[str, int] = {
-        Type.FULLTIME.value: 17,
-        Type.PARTTIME.value: 13
-    }
+    # WAITER_TOTAL: Dict[str, int] = {
+    #    Type.FULLTIME.value: 17,
+    #    Type.PARTTIME.value: 13
+    # }
 
     # Define groups for constraint
     GROUP_A = ["Ana", "Bob", "Alice", "Michael", "Sarah", "David"]
@@ -45,7 +45,7 @@ class WaiterDefinition:
     }
 
     # Minimum waiters per shift
-    MIN_WAITERS_PER_SHIFT = 2
+    # MIN_WAITERS_PER_SHIFT = 2
 
     @classmethod
     def get_fulltime_waiters(cls) -> List[str]:
@@ -55,6 +55,6 @@ class WaiterDefinition:
     def get_parttime_waiters(cls) -> List[str]:
         return cls.WAITER_NAMES[cls.Type.PARTTIME.value]
 
-    @classmethod
-    def get_all_waiters(cls) -> List[str]:
-        return cls.get_fulltime_waiters() + cls.get_parttime_waiters()
+    # @classmethod
+    # def get_all_waiters(cls) -> List[str]:
+    #    return cls.get_fulltime_waiters() + cls.get_parttime_waiters()

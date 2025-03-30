@@ -226,12 +226,12 @@ class RestaurantModel(mesa.Model):
             return 100.0
         return sum(c.satisfaction for c in customers) / len(customers)
 
-    def get_total_profit(self):
-        """Calculate total profit safely"""
-        managers = self.agents.select(agent_type=ManagerAgent)
-        if not managers:
-            return 0.0
-        return sum(m.daily_stats.get('profit', 0) for m in managers)
+    # def get_total_profit(self):
+    #    """Calculate total profit safely"""
+    #    managers = self.agents.select(agent_type=ManagerAgent)
+    #    if not managers:
+    #        return 0.0
+    #    return sum(m.daily_stats.get('profit', 0) for m in managers)
 
     def reset_for_new_day(self):
         """Reset restaurant state for a new day while preserving persistent data"""
