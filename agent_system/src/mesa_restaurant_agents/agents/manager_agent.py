@@ -11,16 +11,6 @@ import numpy as np
 class ManagerAgent(mesa.Agent):
     def __init__(self, model):
         super().__init__(model)
-        # Initialize manager properties
-        #self.food_inventory = {option: 100 for option in food_options}  # Initial stock
-        # Track daily statistics
-        #self.daily_stats = {
-        #    'total_customers': 0,        # Total customers in restaurant
-        #    'avg_waiting_time': 0,       # Average customer waiting time
-        #    'active_waiters': 0,         # Number of available waiters
-        #    'profit': 0                  # Daily profit
-        #}
-
         # Initialize schedule optimizer# Initialize optimizer
         self.schedule_optimizer = ScheduleOptimizer()
 
@@ -42,13 +32,7 @@ class ManagerAgent(mesa.Agent):
                 self.schedule[shift].append(waiter_id)
 
     def step(self):
-        # Update daily statistics
-        #self.daily_stats['total_customers'] = len(self.model.agents.select(agent_type=CustomerAgent))
-        #self.daily_stats['active_waiters'] = len([w for w in self.model.agents.select(agent_type=WaiterAgent)])
-        #self.daily_stats['avg_waiting_time'] = int(round(np.mean([c.waiting_time for c in self.model.agents.select(agent_type=CustomerAgent)] or [0])))
-        #self.calculate_profit()
-
-        # Daily scheduling and predictions (at restaurant opening)
+         # Daily scheduling and predictions (at restaurant opening)
         if self.model.current_minute == self.model.opening_hour:
             # Ensure we have a schedule for today
             if all(len(waiters) == 0 for waiters in self.schedule.values()):
@@ -127,19 +111,3 @@ class ManagerAgent(mesa.Agent):
         print(f"Optimized schedule for day {self.model.current_day}:")
         for shift, waiters in self.schedule.items():
             print(f"Shift {shift}: {', '.join(waiters)} ({len(waiters)} waiters)")
-
-    # def order_food(self, food_type, amount):
-    #     # Replenish food inventory
-    #     self.food_inventory[food_type] += amount
-
-    # def calculate_profit(self):
-    #     # Calculate revenue from customer bills and tips
-    #     # Calculate daily profit considering various costs
-    #     total_sales = sum(w.tips for w in self.model.agents.select(agent_type=WaiterAgent))
-
-    #     # Calculate costs
-    #     staff_costs = len(self.model.agents.select(agent_type=WaiterAgent)) * 10  # Fixed cost per waiter
-    #     food_costs = sum(100 - amount for amount in self.food_inventory.values())
-
-    #     # Update profit
-    #     #self.daily_stats['profit'] = total_sales - (staff_costs + food_costs)

@@ -1,5 +1,4 @@
 from enum import Enum
-from datetime import datetime, timedelta
 
 # Define food options with their prices
 food_options = {

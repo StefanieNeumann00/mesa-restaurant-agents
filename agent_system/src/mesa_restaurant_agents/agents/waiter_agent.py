@@ -1,5 +1,4 @@
 from ..utils.order_status import OrderStatus
-from ..utils.order_status import food_options
 from ..agents.customer_agent import CustomerAgent
 
 import mesa
