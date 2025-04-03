@@ -15,7 +15,6 @@ class RestaurantModel(mesa.Model):
         self.multi_day_mode = True
         self.grid_height = grid_height if grid_height % 2 != 0 else grid_height + 1  # make sure grid_height is uneven
         self.grid_width = grid_width if grid_width % 2 != 0 else grid_width + 1  # make sure grid_width is uneven
-        # self.grid = mesa.space.SingleGrid(self.grid_width, self.grid_height, True)
 
         # Set up environment
         kitchen_x = (self.grid_width // 2) + 2 if self.grid_width % 2 == 1 else (self.grid_width // 2) + 2
@@ -226,13 +225,6 @@ class RestaurantModel(mesa.Model):
             return 100.0
         return sum(c.satisfaction for c in customers) / len(customers)
 
-    # def get_total_profit(self):
-    #    """Calculate total profit safely"""
-    #    managers = self.agents.select(agent_type=ManagerAgent)
-    #    if not managers:
-    #        return 0.0
-    #    return sum(m.daily_stats.get('profit', 0) for m in managers)
-
     def reset_for_new_day(self):
         """Reset restaurant state for a new day while preserving persistent data"""
         # Calculate additional stats
@@ -390,8 +382,6 @@ class RestaurantModel(mesa.Model):
         # Calculate tips from waiters
         total_tips = sum(waiter.tips for waiter in self.agents
                          if hasattr(waiter, 'tips'))
-        
-
 
         # Get food revenue (profit minus tips)
         food_revenue = self.profit - total_tips

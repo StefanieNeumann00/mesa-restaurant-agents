@@ -24,12 +24,6 @@ class WaiterDefinition:
                               ]
     }
 
-    # Waiter totals by type
-    # WAITER_TOTAL: Dict[str, int] = {
-    #    Type.FULLTIME.value: 17,
-    #    Type.PARTTIME.value: 13
-    # }
-
     # Define groups for constraint
     GROUP_A = ["Ana", "Bob", "Alice", "Michael", "Sarah", "David"]
     GROUP_B = ["Putri", "Lala", "Laura", "Emma", "Alex", "Nina"]
@@ -55,6 +49,3 @@ class WaiterDefinition:
     def get_parttime_waiters(cls) -> List[str]:
         return cls.WAITER_NAMES[cls.Type.PARTTIME.value]
 
-    # @classmethod
-    # def get_all_waiters(cls) -> List[str]:
-    #    return cls.get_fulltime_waiters() + cls.get_parttime_waiters()
