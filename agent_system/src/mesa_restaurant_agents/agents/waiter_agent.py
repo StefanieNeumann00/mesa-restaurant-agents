@@ -88,7 +88,9 @@ class WaiterAgent(mesa.Agent):
 
     def manhattan_distance(self, pos1, pos2):
         """Calculate Manhattan distance between two positions"""
-        return abs(pos1[0] - pos2[0]) + abs(pos1[1] - pos2[1])
+        if pos1 and pos2:
+            return abs(pos1[0] - pos2[0]) + abs(pos1[1] - pos2[1])
+        return 1000
 
     def step(self):
         """Main step function for the waiter agent"""

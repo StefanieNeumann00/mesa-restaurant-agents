@@ -63,10 +63,10 @@ class CustomerAgent(mesa.Agent):
         self.satisfaction = max(0, 100 - (self.waiting_time * 2))  # Decrease by 2 points per minute
         total_payment = self.bill + self.tip
 
-        if not hasattr(self.model, 'profit'):
-            self.model.profit = 0  # Ensure profit exists
+        if not hasattr(self.model, 'revenue'):
+            self.model.revenue = 0  # Ensure revenue exists
 
-        self.model.profit += total_payment  # Add payment to model's profit
+        self.model.revenue += total_payment  # Add payment to model's profit
         # print(f"Customer paid: {total_payment}")  # Add debug print
         return total_payment
 

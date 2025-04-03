@@ -25,30 +25,32 @@ def display_mean_step_results(results):
         mean_waiters_count=('Waiters_Count', 'mean'),
         mean_waiting_time=('Average_Wait_Time', 'mean'),
         mean_customer_satisfaction=('Average_Customer_Satisfaction', 'mean'),
-        mean_profit=('Profit', 'mean')).reset_index()
+        mean_revenue=('Revenue', 'mean'),
+        mean_tips = ('Tips', 'mean')).reset_index()
 
     data_grouped['day_hour'] = data_grouped['day'].astype(str) + " " + data_grouped['hours']
-    data_grouped['mean_profit_gradient'] = data_grouped['mean_profit'].diff()
-    data_grouped.loc[data_grouped['mean_profit_gradient'] < -1000, 'mean_profit_gradient'] = None
+    data_grouped['mean_revenue_gradient'] = data_grouped['mean_revenue'].diff()
+    data_grouped.loc[data_grouped['mean_revenue_gradient'] < -1000, 'mean_revenue_gradient'] = None
 
     custom_colors = {
+        'mean_tips':'turquoise',
         'mean_customer_count': 'blue',
         'mean_waiting_time': 'red',
         'mean_customer_satisfaction': 'green',
-        'mean_profit': 'purple',
+        'mean_revenue': 'purple',
         'mean_waiters_count': 'orange',
-        'mean_profit_gradient': 'purple',
+        'mean_revenue_gradient': 'purple',
     }
 
     fig = px.line(data_grouped,
                 x='day_hour',
-                y=['mean_profit'],
+                y=['mean_revenue', 'mean_tips'],
                 labels={
-                    "value": "profit",
+                    "value": "money",
                     "day_hour": "time of day"
                 },
-                title="Profit",
-                color_discrete_map={'mean_profit': custom_colors['mean_profit']})
+                title="Revenue",
+                color_discrete_map={'mean_revenue': custom_colors['mean_revenue']})
 
     for day in data_grouped['day'].unique():
         if f"{day} 15:00" in data_grouped['day_hour'].values:
@@ -63,15 +65,15 @@ def display_mean_step_results(results):
 
     fig = px.line(data_grouped,
                 x='day_hour',
-                y=['mean_customer_count', 'mean_waiters_count', 'mean_profit_gradient'],
+                y=['mean_customer_count', 'mean_waiters_count', 'mean_revenue_gradient'],
                 labels={
-                    "value": "Customer and Waiter Count to Profit Gradient",
+                    "value": "Customer and Waiter Count to Revenue Gradient",
                     "day_hour": "time of day"
                 },
-                title="Customer and Waiter Count to Profit Gradient",
+                title="Customer and Waiter Count to Revenue Gradient",
                 color_discrete_map={'mean_customer_count': custom_colors['mean_customer_count'],
                                     'mean_waiters_count': custom_colors['mean_waiters_count'],
-                                    'mean_profit_gradient': custom_colors['mean_profit_gradient']})
+                                    'mean_revenue_gradient': custom_colors['mean_revenue_gradient']})
 
     for day in data_grouped['day'].unique():
         if f"{day} 15:00" in data_grouped['day_hour'].values:
@@ -88,7 +90,7 @@ def display_mean_step_results(results):
                 x='day_hour',
                 y=['mean_waiting_time', 'mean_customer_satisfaction'],
                 labels={
-                    "value": 'Customer Waiting Time and Satisfaction',
+                    "value": 'unit',
                     "day_hour": "time of day"
                 },
                 title="Customer Waiting Time and Satisfaction",
@@ -106,7 +108,6 @@ def display_mean_step_results(results):
     fig.update_layout(showlegend=False)
     fig.show()
     return data_grouped
-
 
 def display_first_run_step_results_customer(results):
     df = pd.DataFrame(results)
@@ -187,8 +188,8 @@ class GridAnimator:
         df = pd.DataFrame(results)
         data_first_run = df[df["RunId"] == 0]
         self.step_data = data_first_run.to_dict('records')
-        self.grid_width = results[0]['grid_width']  # Set based on your model parameters
-        self.grid_height = results[0]['grid_height']
+        self.grid_height = results[0]['grid_height'] if results[0]['grid_height'] % 2 != 0 else results[0]['grid_height'] + 1  # make sure grid_height is uneven
+        self.grid_width = results[0]['grid_width'] if results[0]['grid_width'] % 2 != 0 else results[0]['grid_width'] + 1  # make sure grid_width is uneven
         self.count = 0
         self.fig, self.ax = plt.subplots(figsize=(10, 10))
         self.init_ani()

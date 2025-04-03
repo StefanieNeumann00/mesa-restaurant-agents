@@ -23,7 +23,7 @@ class RestaurantModel(mesa.Model):
         self.grid = RestaurantGrid(self.grid_width, self.grid_height, self.kitchen.pos)
 
         # Initialize tracking variables
-        self.profit = 0
+        self.revenue = 0
         self.customers_paid = 0
         self.customers_left_without_paying = 0
         self.customer_count = 0
@@ -51,7 +51,7 @@ class RestaurantModel(mesa.Model):
         self.shift_customers = {1: 0, 2: 0, 3: 0}
 
         # Debugging
-        #print(f"Step {self.current_minute}, Profit: {self.profit}")
+        #print(f"Step {self.current_minute}, Revenue: {self.revenue}")
         #print(f"Active customers: {len(self.agents.select(agent_type=CustomerAgent))}")
 
         # Create waiter agents with assignment of fulltime/part-time
@@ -79,8 +79,8 @@ class RestaurantModel(mesa.Model):
 
         # Set up model parameters
         self.n_waiters = n_waiters
-        self.width = grid_width
-        self.height = grid_height
+        self.width = self.grid_width
+        self.height = self.grid_height
 
         # Set up data collection for model metrics
         self.datacollector = mesa.DataCollector(
@@ -92,7 +92,8 @@ class RestaurantModel(mesa.Model):
                 "Waiters_Count": lambda m: m.get_waiters_count(m.agents),
                 "Average_Wait_Time": lambda m: m.get_average_wait_time(),
                 "Average_Customer_Satisfaction": lambda m: m.get_average_satisfaction(),
-                "Profit": lambda m: m.profit,
+                "Revenue": lambda m: m.revenue,
+                "Tips": lambda m: m.get_total_tips(),
                 "Customer_Info": lambda m: m.get_customer_info(m.agents),
                 "Waiter_Info": lambda m: m.get_waiter_info(m.agents),
                 "GridState": lambda m: m.get_grid_state(),
@@ -245,7 +246,7 @@ class RestaurantModel(mesa.Model):
             'day': stats['day'],
             'customers_paid': stats['customers_paid'],
             'customers_left': stats['customers_left'],
-            'profit': stats['total_revenue'],
+            'revenue': stats['total_revenue'],
             'food_revenue': stats['food_revenue'],
             'tips': stats['tips'],
             'served_orders': stats['served_customers'],
@@ -272,7 +273,7 @@ class RestaurantModel(mesa.Model):
         # Reset daily counters
         self.customers_paid = 0
         self.customers_left_without_paying = 0
-        self.profit = 0
+        self.revenue = 0
         self.total_orders_served = 0
 
         # Reset kitchen orders
@@ -377,20 +378,24 @@ class RestaurantModel(mesa.Model):
         #        f"target_pos={w.target_pos}"
         #    )
 
+    def get_total_tips(self):
+        total_tips = sum(waiter.tips for waiter in self.agents
+                         if hasattr(waiter, 'tips'))
+        return total_tips
+        
     def get_daily_stats(self):
         """Get daily statistics for debugging and reporting"""
         # Calculate tips from waiters
-        total_tips = sum(waiter.tips for waiter in self.agents
-                         if hasattr(waiter, 'tips'))
+        total_tips = self.get_total_tips()
 
-        # Get food revenue (profit minus tips)
-        food_revenue = self.profit - total_tips
+        # Get food revenue (revenue minus tips)
+        food_revenue = self.revenue - total_tips
 
         stats = {
             'day': self.current_day,
             'food_revenue': food_revenue,
             'tips': total_tips,
-            'total_revenue': self.profit,
+            'total_revenue': self.revenue,
             'customers_paid': self.customers_paid,
             'customers_left': self.customers_left_without_paying,
             'served_customers': self.total_orders_served
@@ -424,7 +429,7 @@ class RestaurantModel(mesa.Model):
             print(f"Day {self.current_day}, Hour {hour_24_format}:00:")
             print(f"Customers paid: {self.customers_paid}")
             print(f"Customers left without paying: {self.customers_left_without_paying}")
-            print(f"Current profit: ${self.profit:.2f}\n")
+            print(f"Current Revenue: ${self.revenue:.2f}\n")
 
         #print(
         #    f"DEBUG: Day {self.current_day}, minute {self.current_minute}: "
