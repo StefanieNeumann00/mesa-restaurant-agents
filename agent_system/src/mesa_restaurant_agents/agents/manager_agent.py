@@ -28,7 +28,7 @@ class ManagerAgent(mesa.Agent):
         self.shifts = WaiterDefinition.SHIFTS
         self.fulltime_waiters = WaiterDefinition.get_fulltime_waiters()
         self.parttime_waiters = WaiterDefinition.get_parttime_waiters()
-        self.eligible_waiters = WaiterDefinition.ELIGIBLE_WAITERS_BY_SHIFT
+        # self.eligible_waiters = WaiterDefinition.ELIGIBLE_WAITERS_BY_SHIFT
 
         # For storing the current schedule state
         self.predicted_customers = {shift: 0 for shift in self.shifts}
@@ -59,9 +59,9 @@ class ManagerAgent(mesa.Agent):
             #print(f"Waiters assigned per shift: {self.waiters_assigned_count}")
 
             # Print detailed schedule information
-            for shift in self.shifts:
-                waiters_in_shift = self.schedule.get(shift, [])
-                #print(f"Shift {shift}: {', '.join(waiters_in_shift)}")
+            # for shift in self.shifts:
+            #    waiters_in_shift = self.schedule.get(shift, [])
+            #    print(f"Shift {shift}: {', '.join(waiters_in_shift)}")
 
         # At end of day, update training data with actual customer counts
         if self.model.current_minute >= self.model.closing_hour - self.model.time_step:
@@ -124,7 +124,7 @@ class ManagerAgent(mesa.Agent):
         }
 
         # Print the schedule information
-        print(f"Optimized schedule for today:")
+        print(f"Optimized schedule for day {self.model.current_day}:")
         for shift, waiters in self.schedule.items():
             print(f"Shift {shift}: {', '.join(waiters)} ({len(waiters)} waiters)")
 

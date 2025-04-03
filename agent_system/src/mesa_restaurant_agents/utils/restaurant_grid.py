@@ -56,22 +56,22 @@ class RestaurantGrid(mesa.space.MultiGrid):
         if total_cells != self.width * self.height:
             raise ValueError(f"Invalid cell count: {total_cells} vs {self.width * self.height}")
 
-    def debug_print(self):
-        """Print grid layout for debugging"""
-        print("\nGrid layout:")
-        for y in range(self.height):
-            row = []
-            for x in range(self.width):
-                pos = (x, y)
-                if pos == self.layout.get('kitchen'):
-                    row.append('K')
-                elif pos in self.layout.get('tables', set()):
-                    row.append('T')
-                elif pos in self.layout.get('walkways', set()):
-                    row.append('W')
-                else:
-                    row.append('E')
-            print(' '.join(row))
+    # def debug_print(self):
+    #    """Print grid layout for debugging"""
+    #    print("\nGrid layout:")
+    #    for y in range(self.height):
+    #        row = []
+    #        for x in range(self.width):
+    #            pos = (x, y)
+    #            if pos == self.layout.get('kitchen'):
+    #                row.append('K')
+    #            elif pos in self.layout.get('tables', set()):
+    #                row.append('T')
+    #            elif pos in self.layout.get('walkways', set()):
+    #                row.append('W')
+    #            else:
+    #                row.append('E')
+    #        print(' '.join(row))
 
     def position_randomly(self, agent):
         if isinstance(agent, CustomerAgent) and self._empties_customers:
@@ -84,11 +84,11 @@ class RestaurantGrid(mesa.space.MultiGrid):
             return True
         return False
 
-    def is_cell_empty_for_agent(self, agent, pos):
-        if isinstance(agent, CustomerAgent):
-            return pos in self._empties_customers
-        else:
-            return pos in self._empties_workers or pos == self.layout['kitchen']
+    # def is_cell_empty_for_agent(self, agent, pos):
+    #    if isinstance(agent, CustomerAgent):
+    #        return pos in self._empties_customers
+    #    else:
+    #        return pos in self._empties_workers or pos == self.layout['kitchen']
     
     def place_agent(self, agent: mesa.Agent, pos: Coordinate) -> None:
         """Place the agent at the specified location, and set its pos variable."""
@@ -135,24 +135,23 @@ class RestaurantGrid(mesa.space.MultiGrid):
         """Check if a position is a walkway"""
         return pos == self.layout['kitchen']
     
-    def visualize(self):
-        environment = np.zeros((self.width, self.height))
-        for cell_content, (x, y) in self.coord_iter():
-            if cell_content:
-                if isinstance(cell_content, CustomerAgent):
-                    environment[x][y] = EnvironmentDefinition.CUSTOMER.value
-                elif isinstance(cell_content, WaiterAgent):
-                    environment[x][y] = EnvironmentDefinition.WAITER.value
-                elif isinstance(cell_content, ManagerAgent):
-                    environment[x][y] = EnvironmentDefinition.MANAGER.value
-            elif self.is_kitchen((x,y)):
-                environment[x][y] = EnvironmentDefinition.KITCHEN.value
-            elif self.is_walkway((x,y)):
-                environment[x][y] = EnvironmentDefinition.FREE.value
-            elif self.is_table((x,y)):
-                environment[x][y] = EnvironmentDefinition.FREE_TABLE.value
-
-        annot = np.vectorize(EnvironmentDefinition.get_designations().get)(environment)
-
-        return environment, annot
-
+    # def visualize(self):
+    #    environment = np.zeros((self.width, self.height))
+    #    for cell_content, (x, y) in self.coord_iter():
+    #        if cell_content:
+    #            if isinstance(cell_content, CustomerAgent):
+    #                environment[x][y] = EnvironmentDefinition.CUSTOMER.value
+    #            elif isinstance(cell_content, WaiterAgent):
+    #                environment[x][y] = EnvironmentDefinition.WAITER.value
+    #            elif isinstance(cell_content, ManagerAgent):
+    #                environment[x][y] = EnvironmentDefinition.MANAGER.value
+    #        elif self.is_kitchen((x,y)):
+    #            environment[x][y] = EnvironmentDefinition.KITCHEN.value
+    #        elif self.is_walkway((x,y)):
+    #            environment[x][y] = EnvironmentDefinition.FREE.value
+    #        elif self.is_table((x,y)):
+    #            environment[x][y] = EnvironmentDefinition.FREE_TABLE.value
+    #
+    #    annot = np.vectorize(EnvironmentDefinition.get_designations().get)(environment)
+    #
+    #    return environment, annot

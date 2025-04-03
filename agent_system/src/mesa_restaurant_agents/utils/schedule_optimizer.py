@@ -20,7 +20,7 @@ class ScheduleOptimizer:
         self.shifts = WaiterDefinition.SHIFTS
         self.capacity_waiter = WaiterDefinition.CAPACITY_WAITER
         self.waiter_name = WaiterDefinition.WAITER_NAMES
-        self.waiter_total = WaiterDefinition.WAITER_TOTAL
+        # self.waiter_total = WaiterDefinition.WAITER_TOTAL
         self.group_A = WaiterDefinition.GROUP_A
         self.group_B = WaiterDefinition.GROUP_B
         self.eligible_waiters_by_shift = WaiterDefinition.ELIGIBLE_WAITERS_BY_SHIFT
@@ -69,8 +69,8 @@ class ScheduleOptimizer:
         default_prediction = {1: 30, 2: 50, 3: 40}
 
         try:
-            customer_data = np.array([[1], [2], [3]])
-            predictions = self.rf_model.predict(customer_data)
+            X_pred = pd.DataFrame({'Shift': shifts})
+            predictions = self.rf_model.predict(X_pred)
 
             # Create prediction dictionary from model outputs
             predicted_demand = {shift: max(20, round(predictions[i - 1]))
@@ -118,29 +118,29 @@ class ScheduleOptimizer:
         # Retrain the model with updated data
         self._train_model()
 
-    def create_waiter_schedule(self, waiters, predicted_demand, relax_constraints=False):
-        """Create optimal schedule using linear programming"""
-        # Get availability information
-        waiter_availability = {w.unique_id: w.is_available for w in waiters}
-        waiter_vars = {}
-
-        # Convert waiters to proper format for solver
-        fulltime_waiters = [w.unique_id for w in waiters if hasattr(w, 'is_fulltime') and w.is_fulltime]
-        parttime_waiters = [w.unique_id for w in waiters if hasattr(w, 'is_fulltime') and not w.is_fulltime]
-
-        # Try solving with strict constraints first
-        model = self.solve_scheduling_problem(waiter_vars, waiter_availability,
-                                              predicted_demand, fulltime_waiters,
-                                              parttime_waiters, relax_constraints=relax_constraints)
-
-        # Extract schedule from model solution
-        schedule = {shift: [] for shift in [1, 2, 3]}
-        for var_name, var in waiter_vars.items():
-            if model.get_value(var) > 0.5:
-                waiter_id, shift = var_name.rsplit('_', 1)
-                schedule[int(shift)].append(next(w for w in waiters if str(w.unique_id) == waiter_id))
-
-        return schedule, {shift: len(waiters) for shift, waiters in schedule.items()}
+    # def create_waiter_schedule(self, waiters, predicted_demand, relax_constraints=False):
+    #    """Create optimal schedule using linear programming"""
+    #    # Get availability information
+    #    waiter_availability = {w.unique_id: w.is_available for w in waiters}
+    #    waiter_vars = {}
+    #
+    #    # Convert waiters to proper format for solver
+    #    fulltime_waiters = [w.unique_id for w in waiters if hasattr(w, 'is_fulltime') and w.is_fulltime]
+    #    parttime_waiters = [w.unique_id for w in waiters if hasattr(w, 'is_fulltime') and not w.is_fulltime]
+    #
+    #    # Try solving with strict constraints first
+    #    model = self.solve_scheduling_problem(waiter_vars, waiter_availability,
+    #                                          predicted_demand, fulltime_waiters,
+    #                                          parttime_waiters, relax_constraints=relax_constraints)
+    #
+    #    # Extract schedule from model solution
+    #    schedule = {shift: [] for shift in [1, 2, 3]}
+    #    for var_name, var in waiter_vars.items():
+    #        if model.get_value(var) > 0.5:
+    #            waiter_id, shift = var_name.rsplit('_', 1)
+    #            schedule[int(shift)].append(next(w for w in waiters if str(w.unique_id) == waiter_id))
+    #
+    #    return schedule, {shift: len(waiters) for shift, waiters in schedule.items()}
 
     def process_actual_data(self, actual_customer_counts):
         # Update training data with actual counts
@@ -170,7 +170,7 @@ class ScheduleOptimizer:
         Description:
         This function creates and solves an optimization model to assign waiters to shifts while satisfying
         several constraints. The constraints include:
-        1. Each full-time waiter can work at most 2 shifts per day (or 3 if constraints are relaxed).
+        1. Each full-time waiter can work at most 2 shifts per day.
         2. Each part-time waiter can work at most 1 shift per day (or 2 if constraints are relaxed).
         3. The total capacity in each shift must meet or exceed customer demands.
         4. Each shift must have at least 2 waiters.

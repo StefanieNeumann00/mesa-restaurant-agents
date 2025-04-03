@@ -27,12 +27,12 @@ class WaiterAgent(mesa.Agent):
         """Check if the waiter can pick up more food and if the order is valid"""
         return len(self.carrying_food) < self.max_carry
 
-    def move(self, steps=12):
+    def move(self, steps=6):
         """Move towards the target position using A* pathfinding"""
         if not self.target_pos or self.pos == self.target_pos:
             return
 
-        initial_pos = self.pos
+        # initial_pos = self.pos
         moves_made = 0
 
         while moves_made < steps:
@@ -161,9 +161,6 @@ class WaiterAgent(mesa.Agent):
         if not ready_customers:
             return None
 
-        best_customer = None
-        best_score = float('-inf')
-
         customer_scores = []
         for customer in ready_customers:
             # Only look for matches with reassignable food we're carrying
@@ -242,7 +239,7 @@ class WaiterAgent(mesa.Agent):
                     self._mark_customer_served(customer)
 
                     # Get price info for debug output
-                    price = food_options.get(order, {}).get("price", 0)
+                    # price = food_options.get(order, {}).get("price", 0)
                     #print(f"DEBUG: Waiter {self.unique_id} served customer {customer.unique_id} - "
                     #      f"Order: {order}, Price: ${price:.2f}")
 
@@ -262,8 +259,8 @@ class WaiterAgent(mesa.Agent):
                     self._mark_customer_served(customer)
 
                     # Get price info for debug output
-                    price = food_options.get(order, {}).get("price")
-                    #print(
+                    # price = food_options.get(order, {}).get("price")
+                    # print(
                     #    f"DEBUG: Waiter {self.unique_id} served reassigned {order} "
                     #    f"to customer {target_customer.unique_id} - "
                     #    f"Price: ${price:.2f}")
