@@ -176,9 +176,9 @@ class RestaurantModel(mesa.Model):
 
     def calculate_new_customers(self):
         """Calculate number of new customers based on time of day"""
-        base_rate = 0.5  # Base arrival rate (non-peak)
+        base_rate = 0.8  # Base arrival rate (non-peak)
         if self.is_peak_hour():
-            base_rate = 4  # Increased arrival rate during peak hours
+            base_rate = 6  # Increased arrival rate during peak hours
         return np.random.poisson(base_rate)  # Random variation in arrivals
 
     def get_current_shift(self):
@@ -321,7 +321,7 @@ class RestaurantModel(mesa.Model):
 
         # Default min waiters if on day 1 or no schedule exists
         if self.current_day == 1 and not self.manager.waiters_assigned_count.get(shift_id, 0):
-            waiters_needed = 2  # Minimum default for day 1
+            waiters_needed = 4  # Minimum default for day 1
         else:
             waiters_needed = self.manager.waiters_assigned_count.get(shift_id, 2)
 
