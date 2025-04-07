@@ -1,5 +1,6 @@
 from ..utils.order_status import OrderStatus
 from ..agents.customer_agent import CustomerAgent
+from ..utils.order_status import food_options
 
 import mesa
 
@@ -26,12 +27,12 @@ class WaiterAgent(mesa.Agent):
         """Check if the waiter can pick up more food and if the order is valid"""
         return len(self.carrying_food) < self.max_carry
 
-    def move(self, steps=6):
+    def move(self, steps=8):
         """Move towards the target position using A* pathfinding"""
         if not self.target_pos or self.pos == self.target_pos:
             return
 
-        # initial_pos = self.pos
+        initial_pos = self.pos
         moves_made = 0
 
         while moves_made < steps:
@@ -55,7 +56,7 @@ class WaiterAgent(mesa.Agent):
                 break
 
         if moves_made > 0:
-            #print(f"Waiter {self.unique_id} moved from {initial_pos} to {self.pos}, steps: {moves_made}")
+            print(f"Waiter {self.unique_id} moved from {initial_pos} to {self.pos}, steps: {moves_made}")
             return True
 
         return False
@@ -111,12 +112,12 @@ class WaiterAgent(mesa.Agent):
                     target_customer = self.find_best_customer_for_existing_food()
                     if target_customer:
                         self.target_pos = target_customer.pos
-                        #print(
-                        #    f"Waiter {self.unique_id} targeting customer {target_customer.unique_id} for reassignment")
+                        print(
+                            f"Waiter {self.unique_id} targeting customer {target_customer.unique_id} for reassignment")
 
             # Debug current state - moved here after target calculation
-            #print(f"DEBUG: Waiter {self.unique_id} step - available={self.is_available}, "
-            #      f"carrying_food={len(self.carrying_food)}, target_pos={self.target_pos}")
+            print(f"DEBUG: Waiter {self.unique_id} step - available={self.is_available}, "
+                  f"carrying_food={len(self.carrying_food)}, target_pos={self.target_pos}")
 
             # If we have a target, move toward it
             if self.target_pos:
@@ -155,37 +156,73 @@ class WaiterAgent(mesa.Agent):
 
     def find_best_customer_for_existing_food(self):
         """Find the best customer to serve with food we're already carrying"""
+        # First, check if assigned customers still exist and update food status
+        for i, (customer, order) in enumerate(self.carrying_food):
+            if customer is not None:
+                # Check if customer is still in the model and still waiting for food
+                customer_exists = customer in self.model.agents.select(agent_type=CustomerAgent)
+
+                if not customer_exists or customer.order_status not in [OrderStatus.ORDERED, OrderStatus.DELIVERING]:
+                    print(
+                        f"DEBUG: Waiter {self.unique_id} marking {order} as reassignable - customer "
+                        f"{customer.unique_id if hasattr(customer, 'unique_id') else 'None'} no longer valid")
+                    self.carrying_food[i] = (None, order)  # Mark as reassignable
+
+        # Count reassignable food
+        reassignable_food = [(i, order) for i, (cust, order) in enumerate(self.carrying_food) if cust is None]
+        print(
+            f"DEBUG: Waiter {self.unique_id} has {len(reassignable_food)} "
+            f"reassignable food items: {[f[1] for f in reassignable_food]}")
+
+        # If food not reassignable after checking, discard stuck food items
+        if len(reassignable_food) == 0 and len(self.carrying_food) > 0:
+            print(
+                f"DEBUG: Waiter {self.unique_id} discarding undeliverable food: {[order for _, order in self.carrying_food]}")
+            self.carrying_food = []
+            self.target_pos = None
+            return None
+
         ready_customers = [c for c in self.model.agents.select(agent_type=CustomerAgent)
                            if c.order_status in [OrderStatus.ORDERED, OrderStatus.DELIVERING]
                            and not c.assigned_waiter]
+
+        print(f"DEBUG: Found {len(ready_customers)} potential customers for reassignment")
 
         if not ready_customers:
             return None
 
         customer_scores = []
+        matched_orders = {}  # Keep track of which order matched which customer
+
         for customer in ready_customers:
-            # Only look for matches with reassignable food we're carrying
-            matching_food = False
-            for carried_customer, order in self.carrying_food:
-                if carried_customer is None and order == customer.food_preference:
-                    matching_food = True
+            # Check if customer's preference matches any reassignable food
+            for i, order in reassignable_food:
+                if order == customer.food_preference:
+                    waiting_score = customer.waiting_time / 3
+                    distance = self.manhattan_distance(self.pos, customer.pos)
+
+                    # Lower distance penalty to ensure matches happen
+                    distance_penalty = min(distance / 50, waiting_score * 0.3)
+
+                    # High base score to prioritize any match
+                    score = 100 + waiting_score - distance_penalty
+
+                    customer_scores.append((customer, score, i, order))
                     break
-
-            if matching_food:
-                # Apply scoring from get_best_customer
-                waiting_score = customer.waiting_time / 3
-                distance = self.manhattan_distance(self.pos, customer.pos)
-                distance_penalty = distance / 15
-                score = waiting_score - distance_penalty
-
-                customer_scores.append((customer, score))
 
         if customer_scores:
             customer_scores.sort(key=lambda x: x[1], reverse=True)
-            best_customer = customer_scores[0][0]
+            best_customer, _, i, matched_order = customer_scores[0]
             best_customer.assigned_waiter = [self]
+
+            # Update the carrying_food list with new customer
+            self.carrying_food[i] = (best_customer, matched_order)
+
+            print(f"DEBUG: Waiter {self.unique_id} found customer {best_customer.unique_id} for {matched_order}")
             return best_customer
 
+        # No matches found - food is likely undeliverable
+        print(f"DEBUG: Waiter {self.unique_id} couldn't find matching customers for reassignable food")
         return None
 
     def pick_up_prepared_orders(self):
@@ -213,7 +250,7 @@ class WaiterAgent(mesa.Agent):
                 self.carrying_food.append((customer, order))
                 del self.model.kitchen.prepared_orders[customer]
                 orders_picked += 1
-                #print(f"DEBUG: Waiter {self.unique_id} picked up {order} for customer {customer.unique_id}")
+                print(f"DEBUG: Waiter {self.unique_id} picked up {order} for customer {customer.unique_id}")
 
         return orders_picked
 
@@ -229,7 +266,7 @@ class WaiterAgent(mesa.Agent):
         """Serve food to customer, including reassigned """
         # First check if customer is in the right state to receive food
         if target_customer.order_status not in [OrderStatus.ORDERED, OrderStatus.DELIVERING]:
-            #print(f"Cannot serve to customer {target_customer.unique_id} with status {target_customer.order_status}")
+            print(f"Cannot serve to customer {target_customer.unique_id} with status {target_customer.order_status}")
             return False
 
         # Try to serve food originally for this customer
@@ -240,15 +277,15 @@ class WaiterAgent(mesa.Agent):
                     self._mark_customer_served(customer)
 
                     # Get price info for debug output
-                    # price = food_options.get(order, {}).get("price", 0)
-                    #print(f"DEBUG: Waiter {self.unique_id} served customer {customer.unique_id} - "
-                    #      f"Order: {order}, Price: ${price:.2f}")
+                    price = food_options.get(order, {}).get("price", 0)
+                    print(f"DEBUG: Waiter {self.unique_id} served customer {customer.unique_id} - "
+                          f"Order: {order}, Price: ${price:.2f}")
 
                     self.carrying_food.pop(i)  # Remove customer and order from carrying list
                     return True
 
                 # Food can't be served to original customer, mark for reassignment
-                #print(f"DEBUG: Marking {order} for reassignment")
+                print(f"DEBUG: Marking {order} for reassignment")
                 self.carrying_food[i] = (None, order)
                 continue
 
@@ -257,14 +294,14 @@ class WaiterAgent(mesa.Agent):
             if customer is None and order == target_customer.food_preference:
                 # Only serve if customer is still waiting for food
                 if target_customer.order_status in [OrderStatus.ORDERED, OrderStatus.DELIVERING]:
-                    self._mark_customer_served(customer)
+                    self._mark_customer_served(target_customer)
 
                     # Get price info for debug output
-                    # price = food_options.get(order, {}).get("price")
-                    # print(
-                    #    f"DEBUG: Waiter {self.unique_id} served reassigned {order} "
-                    #    f"to customer {target_customer.unique_id} - "
-                    #    f"Price: ${price:.2f}")
+                    price = food_options.get(order, {}).get("price")
+                    print(
+                        f"DEBUG: Waiter {self.unique_id} served reassigned {order} "
+                        f"to customer {target_customer.unique_id} - "
+                        f"Price: ${price:.2f}")
 
                     # Remove the served food from carrying
                     self.carrying_food.pop(i)
