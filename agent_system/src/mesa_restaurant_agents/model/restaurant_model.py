@@ -456,8 +456,6 @@ class RestaurantModel(mesa.Model):
                 # Skip redundant manager step call if we're about to transition days
                 if not (self.multi_day_mode and self.current_minute >= self.closing_hour):
                     manager.step()  # Run manager's end of day processing
-
-        self.datacollector.collect(self)
         
         # Handle day transition ONLY when day actually ends
         if hasattr(self, 'multi_day_mode') and self.multi_day_mode and self.current_minute >= self.closing_hour:
