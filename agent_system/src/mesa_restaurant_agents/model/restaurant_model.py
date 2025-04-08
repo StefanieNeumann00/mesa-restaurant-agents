@@ -265,7 +265,7 @@ class RestaurantModel(mesa.Model):
         else:
             print(f"No schedule available for day {self.current_day + 1}, using defaults")
             if not hasattr(self.manager, 'waiters_assigned_count'):
-                self.manager.waiters_assigned_count = {1: 2, 2: 2, 3: 2}  #
+                self.manager.waiters_assigned_count = {1: 4, 2: 4, 3: 4}  # Default to 4 waiters per shift if not set
 
         # Reset time to opening hour
         self.current_minute = self.opening_hour
@@ -323,7 +323,7 @@ class RestaurantModel(mesa.Model):
         if self.current_day == 1 and not self.manager.waiters_assigned_count.get(shift_id, 0):
             waiters_needed = 4  # Minimum default for day 1
         else:
-            waiters_needed = self.manager.waiters_assigned_count.get(shift_id, 2)
+            waiters_needed = self.manager.waiters_assigned_count.get(shift_id, 4) # Default to 4 if not set
 
         # Get current waiters
         current_waiters = list(self.agents.select(agent_type=WaiterAgent))

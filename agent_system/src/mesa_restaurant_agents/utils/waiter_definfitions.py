@@ -38,9 +38,6 @@ class WaiterDefinition:
             "Michael", "Sarah", "David", "Emma", "Daniel", "Sophia", "Maria", "Ava", "Leo"]
     }
 
-    # Minimum waiters per shift
-    # MIN_WAITERS_PER_SHIFT = 2
-
     @classmethod
     def get_fulltime_waiters(cls) -> List[str]:
         return cls.WAITER_NAMES[cls.Type.FULLTIME.value]

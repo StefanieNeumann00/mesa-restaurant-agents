@@ -91,7 +91,7 @@ class WaiterAgent(mesa.Agent):
         """Calculate Manhattan distance between two positions"""
         if pos1 and pos2:
             return abs(pos1[0] - pos2[0]) + abs(pos1[1] - pos2[1])
-        return 1000
+        return 1000 # Arbitrary large distance if positions are invalid
 
     def step(self):
         """Main step function for the waiter agent"""
@@ -162,6 +162,7 @@ class WaiterAgent(mesa.Agent):
                 # Check if customer is still in the model and still waiting for food
                 customer_exists = customer in self.model.agents.select(agent_type=CustomerAgent)
 
+                # If customer is not in the model or has changed status, mark food as reassignable
                 if not customer_exists or customer.order_status not in [OrderStatus.ORDERED, OrderStatus.DELIVERING]:
                     print(
                         f"DEBUG: Waiter {self.unique_id} marking {order} as reassignable - customer "
@@ -182,6 +183,7 @@ class WaiterAgent(mesa.Agent):
             self.target_pos = None
             return None
 
+        # If we have reassignable food, find a customer to serve
         ready_customers = [c for c in self.model.agents.select(agent_type=CustomerAgent)
                            if c.order_status in [OrderStatus.ORDERED, OrderStatus.DELIVERING]
                            and not c.assigned_waiter]
@@ -192,26 +194,28 @@ class WaiterAgent(mesa.Agent):
             return None
 
         customer_scores = []
-        matched_orders = {}  # Keep track of which order matched which customer
 
         for customer in ready_customers:
             # Check if customer's preference matches any reassignable food
             for i, order in reassignable_food:
                 if order == customer.food_preference:
                     waiting_score = customer.waiting_time / 3
-                    distance = self.manhattan_distance(self.pos, customer.pos)
+                    distance = self.manhattan_distance(self.pos, customer.pos) # Calculate distance to customer
 
-                    # Lower distance penalty to ensure matches happen
+                    # Balance distance penalty - cap it at 30% of waiting score to avoid
+                    # distant customers being perpetually ignored
                     distance_penalty = min(distance / 50, waiting_score * 0.3)
 
-                    # High base score to prioritize any match
+                    # High base score prevent negative scores and stabilize selection
                     score = 100 + waiting_score - distance_penalty
-
+                    # Add customer to the list with their score
                     customer_scores.append((customer, score, i, order))
                     break
 
+        # Sort customers by score
         if customer_scores:
             customer_scores.sort(key=lambda x: x[1], reverse=True)
+            # Select the best customer based on the highest score from the sorted customer scores
             best_customer, _, i, matched_order = customer_scores[0]
             best_customer.assigned_waiter = [self]
 
@@ -240,6 +244,7 @@ class WaiterAgent(mesa.Agent):
             reverse=True
         )
 
+        # Pick up orders for customers who are waiting and not already assigned a waiter
         for customer, order in prioritized_orders[:available_slots]:
             if self.can_pick_up_food(customer, order):
                 # Update customer status to DELIVERING when food is picked up
