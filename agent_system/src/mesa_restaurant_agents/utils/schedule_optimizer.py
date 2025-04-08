@@ -195,13 +195,13 @@ class ScheduleOptimizer:
                 name=f"shift_{shift}_demand"
             )
 
-        # Constraint 4: Each shift must have at least 2 waiters
+        # Constraint 4: Each shift must have at least 4 waiters
         for shift in self.shifts:
             model.add_linear_constraint(
                 poi.quicksum(
                     waiter_vars[f"{waiter}_{shift}"] for waiter in fulltime_waiters + parttime_waiters),
                 poi.Geq,
-                2,
+                4,
                 name=f"shift_{shift}_min_two_waiters"
             )
 
